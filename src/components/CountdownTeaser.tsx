@@ -18,14 +18,28 @@ import {
   Star,
   Users,
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  UserPlus,
+  Heart,
+  Tag,
+  MessageSquare,
+  PlusCircle,
+  Lightbulb,
+  Check
 } from 'lucide-react';
-import { playClockTick, playGrandReveal, playSlideWhoosh } from '../utils/audio';
+import { Category, CommunityNomination } from '../types';
+import { playClockTick, playGrandReveal, playSlideWhoosh, playVoteChime } from '../utils/audio';
 import { triggerGoldenConfetti } from '../utils/confetti';
 
 interface CountdownTeaserProps {
   onReveal: () => void;
   targetDate?: Date;
+  categories?: Category[];
+  communityNominations?: CommunityNomination[];
+  onSubmitNomination?: (nomination: Omit<CommunityNomination, 'id' | 'createdAt' | 'status' | 'communityLikes'>) => void;
+  onLikeNomination?: (nominationId: string) => void;
+  userNickname?: string;
+  userPkxdTag?: string;
 }
 
 interface SlideInfo {
@@ -40,15 +54,19 @@ interface SlideInfo {
 
 export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
   onReveal,
-  targetDate
+  targetDate,
+  categories = [],
+  communityNominations = [],
+  onSubmitNomination,
+  onLikeNomination,
+  userNickname = '',
+  userPkxdTag = ''
 }) => {
-  // Stable target timestamp: Tomorrow at 13:45 (1:45 PM) or custom targetDate
+  // Target timestamp: 15 de Setembro de 2026 às 19:00
   const targetTimestamp = useMemo(() => {
     if (targetDate) return targetDate.getTime();
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    d.setHours(13, 45, 0, 0);
-    return d.getTime();
+    // 15 de Setembro de 2026 às 19:00 (Mês 8 = Setembro no JS Date)
+    return new Date(2026, 8, 15, 19, 0, 0, 0).getTime();
   }, [targetDate]);
 
   const [timeLeft, setTimeLeft] = useState<{
@@ -65,6 +83,96 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
   const [hasInteracted, setHasInteracted] = useState<boolean>(false);
   const [currentSlide, setCurrentSlide] = useState<number>(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(true);
+
+  // Nomination form state in countdown screen
+  const [nominationTab, setNominationTab] = useState<'creator' | 'category'>('creator');
+  const [nomineeName, setNomineeName] = useState('');
+  const [nomineeHandle, setNomineeHandle] = useState('');
+  const [nomineePkxdId, setNomineePkxdId] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(categories[0]?.id || 'cat-creator-ano');
+  const [customCategoryName, setCustomCategoryName] = useState('');
+  const [nominationReason, setNominationReason] = useState('');
+  const [senderName, setSenderName] = useState(userNickname || '');
+  const [senderPkxdTag, setSenderPkxdTag] = useState(userPkxdTag || '#PKXD');
+  const [showSuccessBadge, setShowSuccessBadge] = useState(false);
+  const [localLikedMap, setLocalLikedMap] = useState<Record<string, boolean>>({});
+
+  const handleNominationSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (nominationTab === 'creator') {
+      if (!nomineeName.trim()) return;
+      const targetCat = categories.find((c) => c.id === selectedCategoryId);
+      const catTitle = targetCat?.title || 'Categoria XMA 2026';
+
+      const newNom: Omit<CommunityNomination, 'id' | 'createdAt' | 'status' | 'communityLikes'> = {
+        submittedByName: senderName.trim() || 'Jogador PK XD',
+        submittedByPkxdId: senderPkxdTag.trim() || '#PKXD',
+        nomineeName: nomineeName.trim(),
+        nomineeHandle: nomineeHandle.trim().startsWith('@') 
+          ? nomineeHandle.trim() 
+          : (nomineeHandle.trim() ? `@${nomineeHandle.trim()}` : '@criador_pkxd'),
+        nomineePkxdId: nomineePkxdId.trim().startsWith('#') 
+          ? nomineePkxdId.trim() 
+          : (nomineePkxdId.trim() ? `#${nomineePkxdId.trim()}` : '#0000'),
+        categoryId: selectedCategoryId,
+        categoryTitle: catTitle,
+        workTitle: nominationReason.trim() || 'Indicação Oficial da Comunidade',
+        reason: nominationReason.trim() || 'Destaque e talento no universo PK XD',
+        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80'
+      };
+
+      if (onSubmitNomination) {
+        onSubmitNomination(newNom);
+      }
+    } else {
+      // Suggesting category
+      if (!customCategoryName.trim()) return;
+      const newNom: Omit<CommunityNomination, 'id' | 'createdAt' | 'status' | 'communityLikes'> = {
+        submittedByName: senderName.trim() || 'Jogador PK XD',
+        submittedByPkxdId: senderPkxdTag.trim() || '#PKXD',
+        nomineeName: customCategoryName.trim(),
+        nomineeHandle: '@sugestao_categoria',
+        nomineePkxdId: '#XMA2026',
+        categoryId: 'cat-sugestao-comunidade',
+        categoryTitle: `[NOVA CATEGORIA] ${customCategoryName.trim()}`,
+        workTitle: `Sugestão de Categoria: ${customCategoryName.trim()}`,
+        reason: nominationReason.trim() || 'Sugestão de nova categoria proposta pela comunidade para a gala oficial',
+        avatarUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80'
+      };
+
+      if (onSubmitNomination) {
+        onSubmitNomination(newNom);
+      }
+    }
+
+    try {
+      playVoteChime();
+      triggerGoldenConfetti();
+    } catch {}
+
+    setShowSuccessBadge(true);
+    setNomineeName('');
+    setNomineeHandle('');
+    setNomineePkxdId('');
+    setCustomCategoryName('');
+    setNominationReason('');
+
+    setTimeout(() => {
+      setShowSuccessBadge(false);
+    }, 6000);
+  };
+
+  const handleLike = (nomId: string) => {
+    if (localLikedMap[nomId]) return;
+    setLocalLikedMap((prev) => ({ ...prev, [nomId]: true }));
+    if (onLikeNomination) {
+      onLikeNomination(nomId);
+    }
+    try {
+      playVoteChime();
+    } catch {}
+  };
 
   const tickToggleRef = useRef<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -477,7 +585,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
               PK XD Music & Media Awards 2026
             </p>
             <p className="text-xs sm:text-sm text-zinc-400 font-medium">
-              Grande Estreia Mundial: <strong className="text-amber-300">Amanhã às 13:45 (Horário Oficial)</strong>
+              Grande Estreia Mundial: <strong className="text-amber-300">15 de Setembro às 19:00 (Horário Oficial)</strong>
             </p>
           </motion.div>
 
@@ -539,11 +647,297 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
           </motion.div>
 
           {!hasInteracted && (
-            <p className="text-[11px] text-amber-400/80 mt-6 animate-bounce flex items-center gap-1.5">
+            <p className="text-[11px] text-amber-400/80 mt-4 mb-6 animate-bounce flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
               Clique na tela para ativar o som mecânico de Tic-Tac
             </p>
           )}
+
+          {/* ========================================================================= */}
+          {/* SEÇÃO DE INDICAÇÃO DE CRIADOR & CATEGORIA NA TELA DE CONTAGEM */}
+          {/* ========================================================================= */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.9 }}
+            className="w-full max-w-2xl mt-8 mb-12 relative rounded-3xl bg-gradient-to-b from-[#151624] via-[#10111a] to-[#0a0b12] border-2 border-amber-500/50 p-6 sm:p-8 backdrop-blur-2xl shadow-2xl shadow-amber-950/40 text-left overflow-hidden"
+          >
+            {/* Ambient gold glow */}
+            <div className="absolute -top-16 -right-16 w-60 h-60 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Header */}
+            <div className="relative z-10 space-y-2 border-b border-zinc-800/80 pb-5">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-amber-400/15 border border-amber-400/40 text-amber-300">
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Indicações Abertas da Comunidade • XMA 2026</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black font-cinzel text-white flex items-center gap-2">
+                <span>Indicar Alguém & Categoria</span>
+                <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+                Ajude a comissão organizadora a selecionar os indicados oficiais antes da revelação mundial em <strong className="text-amber-300">15 de Setembro às 19:00</strong>!
+              </p>
+            </div>
+
+            {/* Tabs */}
+            <div className="grid grid-cols-2 gap-2 mt-5 p-1 bg-zinc-950/80 rounded-2xl border border-zinc-800 relative z-10">
+              <button
+                type="button"
+                onClick={() => setNominationTab('creator')}
+                className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  nominationTab === 'creator'
+                    ? 'bg-gradient-to-r from-amber-500/30 via-amber-400/20 to-amber-500/30 text-amber-300 border border-amber-400/50 shadow-md'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <Star className="w-3.5 h-3.5" />
+                <span>Indicar Criador / Astro</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setNominationTab('category')}
+                className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  nominationTab === 'category'
+                    ? 'bg-gradient-to-r from-amber-500/30 via-amber-400/20 to-amber-500/30 text-amber-300 border border-amber-400/50 shadow-md'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <Lightbulb className="w-3.5 h-3.5" />
+                <span>Sugerir Nova Categoria</span>
+              </button>
+            </div>
+
+            {/* Success Alert */}
+            <AnimatePresence>
+              {showSuccessBadge && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                  className="mt-4 p-4 rounded-2xl bg-emerald-950/80 border-2 border-emerald-500/60 text-emerald-200 flex items-center gap-3 shadow-lg shadow-emerald-950/40 relative z-10"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center shrink-0">
+                    <Check className="w-4 h-4 text-emerald-300" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-emerald-300">
+                      Indicação Enviada com Sucesso!
+                    </h4>
+                    <p className="text-[11px] text-emerald-200/90 mt-0.5">
+                      Sua indicação foi registrada no banco oficial e enviada para a comissão organizadora do XMA 2026.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Form */}
+            <form onSubmit={handleNominationSubmit} className="mt-5 space-y-4 relative z-10">
+              {nominationTab === 'creator' ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Nominee Name */}
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-amber-300/90 mb-1">
+                        Nome do Criador / Astro *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={nomineeName}
+                        onChange={(e) => setNomineeName(e.target.value)}
+                        placeholder="Ex: Luluca, Kawan XD, Peter..."
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
+                      />
+                    </div>
+
+                    {/* Nominee Handle / PK XD Tag */}
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                        @ do Canal ou #Tag PK XD
+                      </label>
+                      <input
+                        type="text"
+                        value={nomineeHandle}
+                        onChange={(e) => setNomineeHandle(e.target.value)}
+                        placeholder="Ex: @kawan_oficial ou #0000"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Category Selection */}
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-amber-300/90 mb-1">
+                      Categoria do XMA 2026 *
+                    </label>
+                    <select
+                      value={selectedCategoryId}
+                      onChange={(e) => setSelectedCategoryId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs outline-none transition-all cursor-pointer"
+                    >
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.id} className="bg-zinc-900 text-white">
+                          🏆 {cat.title}
+                        </option>
+                      ))}
+                      {categories.length === 0 && (
+                        <>
+                          <option value="cat-creator-ano" className="bg-zinc-900 text-white">🏆 Criador PK XD do Ano</option>
+                          <option value="cat-hit-musical" className="bg-zinc-900 text-white">🏆 Melhor Hit Musical PK XD</option>
+                          <option value="cat-clipe-visual" className="bg-zinc-900 text-white">🏆 Melhor Clipe & Produção Audiovisual</option>
+                          <option value="cat-estilo-look" className="bg-zinc-900 text-white">🏆 Melhor Look & Estilo Metálico</option>
+                          <option value="cat-revelacao-ano" className="bg-zinc-900 text-white">🏆 Revelação do Ano & Comunidade</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  {/* Reason / Work */}
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                      Por que você indica esse criador? (Obra / Motivo)
+                    </label>
+                    <input
+                      type="text"
+                      value={nominationReason}
+                      onChange={(e) => setNominationReason(e.target.value)}
+                      placeholder="Ex: Lançou o melhor clipe do ano, conteúdos diários divertidos..."
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Suggest New Category */}
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-amber-300/90 mb-1">
+                      Nome da Nova Categoria *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={customCategoryName}
+                      onChange={(e) => setCustomCategoryName(e.target.value)}
+                      placeholder="Ex: Melhor Casa Decorada, Streamer Mais Divertido, Melhor Paródia..."
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                      Por que essa categoria deve existir no XMA 2026?
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={nominationReason}
+                      onChange={(e) => setNominationReason(e.target.value)}
+                      placeholder="Explique a importância dessa premiação para a comunidade PK XD..."
+                      className="w-full px-3.5 py-2 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all resize-none"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Sender Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                    Seu Apelido / Nome
+                  </label>
+                  <input
+                    type="text"
+                    value={senderName}
+                    onChange={(e) => setSenderName(e.target.value)}
+                    placeholder="Ex: Kawan, Jogador XD..."
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                    Sua Tag PK XD
+                  </label>
+                  <input
+                    type="text"
+                    value={senderPkxdTag}
+                    onChange={(e) => setSenderPkxdTag(e.target.value)}
+                    placeholder="Ex: #0000 ou #PLAYER"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-black font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xl shadow-amber-500/25 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Send className="w-4 h-4 text-black" />
+                <span>{nominationTab === 'creator' ? 'Enviar Indicação de Criador' : 'Enviar Sugestão de Categoria'}</span>
+                <Sparkles className="w-4 h-4 text-black" />
+              </button>
+            </form>
+
+            {/* Community Live Feed (Recent Nominations) */}
+            {communityNominations.length > 0 && (
+              <div className="mt-8 pt-6 border-t border-zinc-800/80 space-y-3 relative z-10">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-300/90 flex items-center gap-1.5 font-cinzel">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Últimas Indicações da Galera ({communityNominations.length})</span>
+                  </h4>
+                  <span className="text-[10px] text-zinc-500 font-mono">Atualizado em tempo real</span>
+                </div>
+
+                <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                  {communityNominations.slice(0, 6).map((nom) => {
+                    const isLiked = Boolean(localLikedMap[nom.id]);
+                    const currentLikes = nom.communityLikes + (isLiked ? 1 : 0);
+
+                    return (
+                      <div
+                        key={nom.id}
+                        className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 hover:border-amber-400/30 transition-all flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-xs text-white truncate">
+                              {nom.nomineeName}
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 truncate">
+                              {nom.categoryTitle || 'Categoria XMA'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-zinc-400 truncate mt-0.5">
+                            {nom.reason || nom.workTitle}
+                          </p>
+                          <p className="text-[10px] text-zinc-500 mt-0.5">
+                            Indicado por: <span className="text-zinc-300">{nom.submittedByName}</span> ({nom.submittedByPkxdId})
+                          </p>
+                        </div>
+
+                        {/* Like/Support Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleLike(nom.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                            isLiked
+                              ? 'bg-rose-500/20 text-rose-300 border border-rose-400/40 shadow-sm'
+                              : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-rose-300 border border-zinc-700'
+                          }`}
+                          title="Apoiar esta indicação"
+                        >
+                          <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-rose-400 text-rose-400' : ''}`} />
+                          <span>{currentLikes}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </motion.div>
         </main>
       )}
 

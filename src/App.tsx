@@ -331,9 +331,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#090a0f] text-zinc-100 flex flex-col selection:bg-amber-400 selection:text-black">
-      {/* Locked Fullscreen Countdown Teaser (Amanhã 13:45) */}
+      {/* Locked Fullscreen Countdown Teaser (15 de Setembro 19:00) */}
       {isCountdownActive && (
         <CountdownTeaser
+          categories={categories}
+          communityNominations={communityNominations}
+          onSubmitNomination={handleCommunityNominationSubmit}
+          onLikeNomination={handleLikeNomination}
+          userNickname={userAccount.nickname}
+          userPkxdTag={userAccount.pkxdTag}
           onReveal={() => {
             setIsCountdownActive(false);
           }}
