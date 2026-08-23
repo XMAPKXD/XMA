@@ -27,9 +27,10 @@ import {
   Lightbulb,
   Check
 } from 'lucide-react';
-import { Category, CommunityNomination } from '../types';
-import { playClockTick, playGrandReveal, playSlideWhoosh, playVoteChime } from '../utils/audio';
+import { Category, CommunityNomination, isAuthorizedAdminEmail } from '../types';
+import { playClockTick, playGrandReveal, playSlideWhoosh, playVoteChime, playFanfare, playAdminGavel } from '../utils/audio';
 import { triggerGoldenConfetti } from '../utils/confetti';
+import { signInWithGoogle } from '../lib/firebase';
 
 interface CountdownTeaserProps {
   onReveal: () => void;
@@ -40,6 +41,7 @@ interface CountdownTeaserProps {
   onLikeNomination?: (nominationId: string) => void;
   userNickname?: string;
   userPkxdTag?: string;
+  onAdminUnlock?: (user: { name: string; tag: string; avatar: string; email?: string }) => void;
 }
 
 interface SlideInfo {
@@ -60,7 +62,8 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
   onSubmitNomination,
   onLikeNomination,
   userNickname = '',
-  userPkxdTag = ''
+  userPkxdTag = '',
+  onAdminUnlock
 }) => {
   // Target timestamp: 15 de Setembro de 2026 às 19:00
   const targetTimestamp = useMemo(() => {
@@ -172,6 +175,50 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
     try {
       playVoteChime();
     } catch {}
+  };
+
+  // Admin Modal & State
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  const handleGoogleAdminLogin = async () => {
+    try {
+      setIsGoogleLoading(true);
+      setAdminError(null);
+      const googleUser = await signInWithGoogle();
+      if (!googleUser || !googleUser.email) {
+        setAdminError('Nenhum e-mail retornado pelo login do Google.');
+        return;
+      }
+
+      if (isAuthorizedAdminEmail(googleUser.email)) {
+        try {
+          sessionStorage.setItem('xma_admin_session_unlocked', 'true');
+          playFanfare();
+          playAdminGavel();
+          triggerGoldenConfetti();
+        } catch {}
+
+        if (onAdminUnlock) {
+          onAdminUnlock({
+            name: googleUser.displayName || 'Admin XMA',
+            tag: `#${googleUser.uid.slice(-4) || 'ADM'}`,
+            avatar: googleUser.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
+            email: googleUser.email
+          });
+        }
+        setIsAdminModalOpen(false);
+        onReveal();
+      } else {
+        setAdminError(`Acesso negado. O e-mail (${googleUser.email}) não é um Administrador autorizado.`);
+      }
+    } catch (err: any) {
+      console.error('Google admin login error:', err);
+      setAdminError('Falha no login do Google.');
+    } finally {
+      setIsGoogleLoading(false);
+    }
   };
 
   const tickToggleRef = useRef<boolean>(false);
@@ -517,28 +564,18 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
             </button>
           )}
 
-          {/* Quick Reveal / Trigger Button */}
-          {viewMode === 'teaser' ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                triggerRevealSequence();
-              }}
-              className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-amber-500/20 hover:from-amber-500/40 hover:to-amber-400/40 text-amber-200 border border-amber-400/50 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-lg backdrop-blur-md hover:scale-105 active:scale-95"
-              title="Revelar o site agora"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>Revelar Agora</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => onReveal()}
-              className="px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-black font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-amber-500/25 hover:scale-105 active:scale-95"
-            >
-              <span>Entrar no Portal</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
+          {/* Admin Access Button (Locked for Admins only before countdown ends) */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsAdminModalOpen(true);
+            }}
+            className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-amber-500/20 hover:from-amber-500/40 hover:to-amber-400/40 text-amber-200 border border-amber-400/50 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-lg backdrop-blur-md hover:scale-105 active:scale-95"
+            title="Acesso exclusivo para administradores e organizadores"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+            <span>Acesso Admin 🔐</span>
+          </button>
         </div>
       </header>
 
@@ -1140,6 +1177,87 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
               </p>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Admin Verification Modal */}
+      <AnimatePresence>
+        {isAdminModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-md rounded-3xl bg-gradient-to-b from-[#181926] via-[#10111a] to-[#0a0b12] border-2 border-amber-500/60 p-6 sm:p-8 shadow-2xl shadow-amber-950/60 text-left relative overflow-hidden"
+            >
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black font-cinzel text-white">
+                      Acesso Administrativo
+                    </h3>
+                    <p className="text-[11px] text-amber-400/90 font-mono">
+                      XMA 2026 • Painel de Controle
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAdminModalOpen(false)}
+                  className="p-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-all cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="text-xs text-zinc-300 leading-relaxed mb-5">
+                O site está bloqueado em contagem regressiva até <strong className="text-amber-300">15 de Setembro às 19:00</strong>. Apenas organizadores autorizados podem gerenciar a cerimônia e testar os módulos.
+              </p>
+
+              {adminError && (
+                <div className="mb-4 p-3 rounded-xl bg-rose-950/80 border border-rose-500/60 text-rose-200 text-xs flex items-center gap-2">
+                  <span className="font-bold">⚠️ {adminError}</span>
+                </div>
+              )}
+
+              {/* Exclusive Admin Google Login */}
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={handleGoogleAdminLogin}
+                  disabled={isGoogleLoading}
+                  className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-md cursor-pointer hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                    />
+                  </svg>
+                  <span>{isGoogleLoading ? 'Verificando Conta Google...' : 'Entrar com Google Oficial Admin'}</span>
+                </button>
+
+                <p className="text-[11px] text-zinc-500 text-center">
+                  Permitido apenas para e-mails cadastrados na lista oficial de Administradores.
+                </p>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

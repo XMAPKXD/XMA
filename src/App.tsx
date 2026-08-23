@@ -340,8 +340,28 @@ export default function App() {
           onLikeNomination={handleLikeNomination}
           userNickname={userAccount.nickname}
           userPkxdTag={userAccount.pkxdTag}
-          onReveal={() => {
+          onAdminUnlock={(adminUser) => {
+            setUserAccount({
+              isLoggedIn: true,
+              nickname: adminUser.name,
+              pkxdTag: adminUser.tag,
+              avatarUrl: adminUser.avatar,
+              email: adminUser.email,
+              verifiedVotes: {}
+            });
             setIsCountdownActive(false);
+            setActiveTab('admin');
+          }}
+          onReveal={() => {
+            // Check if user is admin before unlocking
+            try {
+              const isAdminSession = sessionStorage.getItem('xma_admin_session_unlocked') === 'true';
+              if (isAdminSession) {
+                setIsCountdownActive(false);
+              }
+            } catch {
+              setIsCountdownActive(false);
+            }
           }}
         />
       )}
