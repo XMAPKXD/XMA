@@ -1,0 +1,6 @@
+{
+  "name": "XMA — PK XD Music & Media Awards",
+  "description": "Premiação oficial XMA com galeria de indicados, votação em tempo real, cerimônia ao vivo e painel de controle admin.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

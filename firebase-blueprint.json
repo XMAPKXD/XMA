@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "collections": [
+    {
+      "id": "categories",
+      "description": "Categories for XMA Awards 2026",
+      "fields": [
+        { "name": "id", "type": "string", "description": "Category ID" },
+        { "name": "name", "type": "string", "description": "Category Name" },
+        { "name": "status", "type": "string", "description": "Voting status" }
+      ]
+    },
+    {
+      "id": "community_nominations",
+      "description": "Community submitted nominations",
+      "fields": [
+        { "name": "id", "type": "string", "description": "Nomination ID" },
+        { "name": "nomineeName", "type": "string", "description": "Nominee name" },
+        { "name": "status", "type": "string", "description": "Status" }
+      ]
+    }
+  ]
+}

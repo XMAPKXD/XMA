@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --gold-primary: #f59e0b;
+    --gold-bright: #fbbf24;
+    --gold-light: #fef08a;
+    --gold-dark: #b45309;
+    --silver-primary: #cbd5e1;
+    --silver-bright: #f8fafc;
+    --silver-dark: #64748b;
+    --obsidian-dark: #0a0a0d;
+    --obsidian-surface: #121318;
+    --obsidian-card: #181920;
+    --obsidian-border: #272732;
+  }
+}
+
+/* Metallic Text & Badges */
+.font-cinzel {
+  font-family: 'Cinzel', serif;
+}
+
+.font-syne {
+  font-family: 'Syne', sans-serif;
+}
+
+.text-gold-metallic {
+  background: linear-gradient(135deg, #fff2a3 0%, #ffd700 25%, #d4af37 50%, #fff6a8 75%, #aa771c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 8px rgba(212, 175, 55, 0.35));
+}
+
+.text-silver-metallic {
+  background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 30%, #94a3b8 60%, #ffffff 85%, #64748b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 8px rgba(226, 232, 240, 0.25));
+}
+
+.text-bronze-metallic {
+  background: linear-gradient(135deg, #fed7aa 0%, #fb923c 40%, #c2410c 80%, #7c2d12 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Metallic Borders & Cards */
+.gold-card {
+  background: radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.12) 0%, rgba(15, 15, 20, 0.95) 75%);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8), 0 0 20px -5px rgba(212, 175, 55, 0.15);
+}
+
+.gold-card:hover {
+  border-color: rgba(251, 191, 36, 0.6);
+  box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.9), 0 0 25px rgba(212, 175, 55, 0.28);
+}
+
+.silver-card {
+  background: radial-gradient(circle at 50% 0%, rgba(226, 232, 240, 0.08) 0%, rgba(15, 15, 20, 0.95) 75%);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8), 0 0 15px -5px rgba(226, 232, 240, 0.1);
+}
+
+.gold-border-gradient {
+  border-image: linear-gradient(135deg, #ffd700, #b45309, #fef08a, #d4af37) 1;
+}
+
+.bg-gold-metallic-btn {
+  background: linear-gradient(135deg, #ffe066 0%, #d4af37 35%, #996515 70%, #ffd700 100%);
+  color: #0b0b0e;
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.6);
+  transition: all 0.25s ease;
+}
+
+.bg-gold-metallic-btn:hover {
+  background: linear-gradient(135deg, #fff085 0%, #e5c158 35%, #b38728 70%, #ffe484 100%);
+  box-shadow: 0 6px 22px rgba(212, 175, 55, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.8);
+  transform: translateY(-1px);
+}
+
+.bg-silver-metallic-btn {
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 35%, #64748b 70%, #f1f5f9 100%);
+  color: #0b0b0e;
+  box-shadow: 0 4px 15px rgba(203, 213, 225, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+}
+
+.bg-silver-metallic-btn:hover {
+  background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 35%, #94a3b8 70%, #ffffff 100%);
+  box-shadow: 0 6px 20px rgba(203, 213, 225, 0.5);
+  transform: translateY(-1px);
+}
+
+.bg-obsidian-metallic-btn {
+  background: linear-gradient(180deg, #22232e 0%, #13141a 100%);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  color: #f1f5f9;
+}
+
+.bg-obsidian-metallic-btn:hover {
+  border-color: rgba(212, 175, 55, 0.6);
+  background: linear-gradient(180deg, #2c2e3d 0%, #1a1b24 100%);
+}
+
+/* Metallic Shimmer Animation */
+@keyframes metallic-shine {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 215, 0, 0.2) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: metallic-shine 3.5s infinite;
+}
+
+/* Custom Gold Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0d0e12;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #d4af37, #64748b);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #facc15, #94a3b8);
+}
+
+/* Stage Spotlight Effect */
+.stage-spotlight {
+  background: radial-gradient(ellipse at 50% -20%, rgba(212, 175, 55, 0.28) 0%, rgba(203, 213, 225, 0.08) 45%, rgba(10, 10, 13, 0) 80%);
+}
+
+.gold-glow {
+  filter: drop-shadow(0 0 18px rgba(245, 158, 11, 0.45));
+}
