@@ -174,7 +174,7 @@ export default function App() {
     } catch {}
   }, [isCountdownActive]);
 
-  // Mass Voting Handler (Unlimited votes for fan club mass campaigns)
+  // Mass Voting Handler (Unlimited votes for fan club mass campaigns - 25% weight)
   const handleMassVote = (categoryId: string, nomineeId: string, quantity: number) => {
     const updatedCategories = categories.map((cat) => {
       if (cat.id === categoryId) {
@@ -182,7 +182,12 @@ export default function App() {
           ...cat,
           nominees: cat.nominees.map((n) => {
             if (n.id === nomineeId) {
-              return { ...n, votes: n.votes + quantity };
+              const currentMass = n.massVotes !== undefined ? n.massVotes : Math.max(0, n.votes - (n.verifiedVotes || 0));
+              return { 
+                ...n, 
+                votes: n.votes + quantity,
+                massVotes: currentMass + quantity
+              };
             }
             return n;
           })
@@ -195,7 +200,7 @@ export default function App() {
     setUserVotes((prev) => ({ ...prev, [categoryId]: nomineeId }));
   };
 
-  // Verified Single Vote Handler (1 vote per category with PK XD login)
+  // Verified Single Vote Handler (1 vote per category with PK XD login - 75% weight)
   const handleVerifiedSingleVote = (categoryId: string, nomineeId: string) => {
     const prevNomineeId = userAccount.verifiedVotes[categoryId];
 
@@ -204,11 +209,16 @@ export default function App() {
         return {
           ...cat,
           nominees: cat.nominees.map((n) => {
+            const currentUnique = n.verifiedVotes || 0;
+            const currentMass = n.massVotes !== undefined ? n.massVotes : Math.max(0, n.votes - currentUnique);
+
             if (n.id === nomineeId) {
+              const isSame = prevNomineeId === nomineeId;
               return { 
                 ...n, 
-                votes: n.votes + (prevNomineeId === nomineeId ? 0 : 1),
-                verifiedVotes: (n.verifiedVotes || 0) + (prevNomineeId === nomineeId ? 0 : 1)
+                votes: n.votes + (isSame ? 0 : 1),
+                verifiedVotes: currentUnique + (isSame ? 0 : 1),
+                massVotes: currentMass
               };
             }
             if (prevNomineeId && n.id === prevNomineeId && prevNomineeId !== nomineeId) {
@@ -216,7 +226,8 @@ export default function App() {
               return {
                 ...n,
                 votes: Math.max(0, n.votes - 1),
-                verifiedVotes: Math.max(0, (n.verifiedVotes || 0) - 1)
+                verifiedVotes: Math.max(0, currentUnique - 1),
+                massVotes: currentMass
               };
             }
             return n;

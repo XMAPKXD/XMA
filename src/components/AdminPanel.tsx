@@ -33,11 +33,14 @@ import {
   Award,
   AlertTriangle,
   LogIn,
-  Check
+  Check,
+  BarChart3,
+  Activity
 } from 'lucide-react';
 import { triggerWinnerTrophyBlast, triggerGoldenConfetti } from '../utils/confetti';
 import { playFanfare, playAdminGavel, playVoteChime } from '../utils/audio';
 import { signInWithGoogle } from '../lib/firebase';
+import { AdminVotingStats } from './AdminVotingStats';
 
 interface AdminPanelProps {
   categories: Category[];
@@ -84,7 +87,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [googleError, setGoogleError] = useState<string | null>(null);
 
   // Sub-tabs
-  const [activeSubTab, setActiveSubTab] = useState<'categories' | 'nominees' | 'community' | 'envelopes' | 'settings'>('nominees');
+  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'nominees' | 'categories' | 'community' | 'envelopes' | 'settings'>('stats');
   
   // Nominee form state
   const [isAddingNominee, setIsAddingNominee] = useState<boolean>(false);
@@ -631,6 +634,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         {/* Sub-Navigation Tabs */}
         <div className="mt-8 pt-6 border-t border-zinc-800 flex items-center gap-2 overflow-x-auto scrollbar-none">
           {[
+            { id: 'stats', label: '📊 Estatísticas & Auditoria (75/25)', icon: BarChart3 },
             { id: 'nominees', label: '🌟 Indicados Oficiais', icon: Users },
             { id: 'categories', label: '🏆 Categorias do XMA', icon: Trophy },
             { id: 'community', label: `💡 Indicações da Comunidade (${communityNominations.filter(n => n.status === 'pending').length})`, icon: UserPlus },
@@ -656,6 +660,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           })}
         </div>
       </div>
+
+      {/* 0. VOTING STATS & SUSPICIOUS SPIKES AUDIT TABLE (75% UNIQUE / 25% MASS WEIGHT) */}
+      {activeSubTab === 'stats' && (
+        <AdminVotingStats
+          categories={categories}
+          onUpdateCategories={onUpdateCategories}
+        />
+      )}
 
       {/* 1. NOMINEES CRUD MANAGER */}
       {activeSubTab === 'nominees' && (

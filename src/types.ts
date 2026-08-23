@@ -10,12 +10,28 @@ export interface Nominee {
   projectDescription: string;
   projectMediaUrl?: string;
   projectType: 'music_clip' | 'media_creator' | 'parody' | 'look_style' | 'breakthrough' | 'community_icon';
-  votes: number;
-  verifiedVotes?: number; // Official logged-in single votes
+  votes: number; // Total gross votes
+  verifiedVotes?: number; // Official logged-in unique votes (75% weight)
+  massVotes?: number; // Mass clicks / fan-club multi-votes (25% weight)
   pkxdId: string;
   bio: string;
   accentColor?: string;
   badge?: string;
+}
+
+export interface SuspiciousVoteSpike {
+  id: string;
+  nomineeId: string;
+  nomineeName: string;
+  categoryId: string;
+  categoryTitle: string;
+  timestamp: string;
+  spikeType: 'bot_burst' | 'mass_flood' | 'disproportionate_ratio' | 'rapid_clicks';
+  votesCount: number;
+  uniqueCount: number;
+  massCount: number;
+  severity: 'high' | 'medium' | 'low';
+  description: string;
 }
 
 export interface Category {
