@@ -1,16 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Category, CommunityNomination } from '../types';
 import { 
   Sparkles, 
   Send, 
-  Heart, 
   CheckCircle2, 
   Award, 
   UserPlus, 
-  ExternalLink, 
-  MessageSquare,
   HelpCircle,
-  ThumbsUp
+  Upload,
+  Image as ImageIcon,
+  ShieldCheck,
+  Lock,
+  Instagram,
+  Video,
+  Youtube,
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { triggerGoldenConfetti } from '../utils/confetti';
@@ -18,91 +23,167 @@ import { playVoteChime } from '../utils/audio';
 
 interface CommunityNominationFormProps {
   categories: Category[];
-  nominations: CommunityNomination[];
+  nominations?: CommunityNomination[];
   onSubmitNomination: (nomination: Omit<CommunityNomination, 'id' | 'createdAt' | 'status' | 'communityLikes'>) => void;
-  onLikeNomination: (nominationId: string) => void;
+  onLikeNomination?: (nominationId: string) => void;
   userPkxdTag?: string;
   userNickname?: string;
 }
 
 export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = ({
   categories,
-  nominations,
   onSubmitNomination,
-  onLikeNomination,
   userPkxdTag = '',
   userNickname = ''
 }) => {
   const [formData, setFormData] = useState({
     submittedByName: userNickname || '',
-    submittedByPkxdId: userPkxdTag || '#PKXD',
+    submittedByPkxdId: userPkxdTag || '',
     nomineeName: '',
-    nomineeHandle: '',
     nomineePkxdId: '',
+    instagram: '',
+    tiktok: '',
+    youtube: '',
     categoryId: categories[0]?.id || '',
     workTitle: '',
     workUrl: '',
     reason: '',
-    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80'
+    avatarUrl: ''
   });
 
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [submittedSuccess, setSubmittedSuccess] = useState<boolean>(false);
-  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [lastSubmittedNominee, setLastSubmittedNominee] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedCategoryObj = categories.find((c) => c.id === formData.categoryId);
 
+  // Handle local image file upload
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 3 * 1024 * 1024) {
+      alert('A imagem é muito grande. Escolha uma foto de até 3MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setFormData((prev) => ({ ...prev, avatarUrl: String(event.target?.result) }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = () => {
+    setFormData((prev) => ({ ...prev, avatarUrl: '' }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.nomineeName.trim() || !formData.submittedByName.trim()) return;
+    setValidationError(null);
+
+    if (!formData.nomineeName.trim()) {
+      setValidationError('Por favor, informe o nome do criador ou astro indicado.');
+      return;
+    }
+
+    if (!formData.submittedByName.trim()) {
+      setValidationError('Por favor, informe seu nickname de jogador.');
+      return;
+    }
+
+    // Validation: AT LEAST ONE SOCIAL NETWORK IS REQUIRED (Instagram, TikTok, or YouTube)
+    const hasInstagram = formData.instagram.trim().length > 0;
+    const hasTiktok = formData.tiktok.trim().length > 0;
+    const hasYoutube = formData.youtube.trim().length > 0;
+
+    if (!hasInstagram && !hasTiktok && !hasYoutube) {
+      setValidationError('É obrigatório informar ao menos uma rede social do indicado: Instagram, TikTok ou YouTube.');
+      return;
+    }
+
+    // Determine primary handle from provided socials
+    let primaryHandle = '';
+    if (hasInstagram) {
+      const ig = formData.instagram.trim();
+      primaryHandle = ig.startsWith('@') || ig.startsWith('http') ? ig : `@${ig}`;
+    } else if (hasTiktok) {
+      const tt = formData.tiktok.trim();
+      primaryHandle = tt.startsWith('@') || tt.startsWith('http') ? tt : `@${tt}`;
+    } else if (hasYoutube) {
+      const yt = formData.youtube.trim();
+      primaryHandle = yt.startsWith('@') || yt.startsWith('http') ? yt : `@${yt}`;
+    }
+
+    const nomineeTag = formData.nomineePkxdId.trim()
+      ? (formData.nomineePkxdId.trim().startsWith('#') ? formData.nomineePkxdId.trim() : `#${formData.nomineePkxdId.trim()}`)
+      : '#000';
+
+    const submitterTag = formData.submittedByPkxdId.trim()
+      ? (formData.submittedByPkxdId.trim().startsWith('#') ? formData.submittedByPkxdId.trim() : `#${formData.submittedByPkxdId.trim()}`)
+      : '#000';
 
     onSubmitNomination({
       submittedByName: formData.submittedByName.trim(),
-      submittedByPkxdId: formData.submittedByPkxdId.trim() || '#PLAYER',
+      submittedByPkxdId: submitterTag,
       nomineeName: formData.nomineeName.trim(),
-      nomineeHandle: formData.nomineeHandle.trim().startsWith('@') 
-        ? formData.nomineeHandle.trim() 
-        : `@${formData.nomineeHandle.trim()}`,
-      nomineePkxdId: formData.nomineePkxdId.trim().startsWith('#')
-        ? formData.nomineePkxdId.trim()
-        : `#${formData.nomineePkxdId.trim()}`,
+      nomineeHandle: primaryHandle,
+      nomineePkxdId: nomineeTag,
+      instagram: formData.instagram.trim() || undefined,
+      tiktok: formData.tiktok.trim() || undefined,
+      youtube: formData.youtube.trim() || undefined,
       categoryId: formData.categoryId,
       categoryTitle: selectedCategoryObj?.title || 'Categoria XMA',
       workTitle: formData.workTitle.trim() || 'Trabalho Autoral PK XD',
       workUrl: formData.workUrl.trim(),
-      reason: formData.reason.trim(),
-      avatarUrl: formData.avatarUrl.trim() || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80'
+      reason: formData.reason.trim() || 'Destaque e talento no universo PK XD',
+      avatarUrl: formData.avatarUrl.trim() || undefined
     });
 
     playVoteChime();
     triggerGoldenConfetti();
+    setLastSubmittedNominee(formData.nomineeName.trim());
     setSubmittedSuccess(true);
 
-    // Reset fields except user's name
-    setFormData({
-      submittedByName: formData.submittedByName,
-      submittedByPkxdId: formData.submittedByPkxdId,
+    // Reset nominee inputs while keeping user identity
+    setFormData((prev) => ({
+      ...prev,
       nomineeName: '',
-      nomineeHandle: '',
       nomineePkxdId: '',
+      instagram: '',
+      tiktok: '',
+      youtube: '',
       categoryId: categories[0]?.id || '',
       workTitle: '',
       workUrl: '',
       reason: '',
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80'
-    });
+      avatarUrl: ''
+    }));
 
-    setTimeout(() => {
-      setSubmittedSuccess(false);
-    }, 6000);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    // Scroll to success banner
+    window.scrollTo({ top: 120, behavior: 'smooth' });
   };
 
-  const filteredNominations = nominations.filter((n) => {
-    if (filterCategory === 'all') return true;
-    return n.categoryId === filterCategory;
-  });
+  // Helper initials for avatar preview when no photo is provided
+  const getInitials = (name: string) => {
+    if (!name.trim()) return 'XD';
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
 
   return (
-    <div className="space-y-12 pb-16">
+    <div className="space-y-10 pb-20 max-w-6xl mx-auto">
       {/* Hero Header */}
       <div className="relative rounded-3xl bg-gradient-to-r from-[#171822] via-[#2a2212] to-[#12131b] border-2 border-amber-500/50 p-6 sm:p-10 shadow-2xl overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
@@ -110,7 +191,7 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
         <div className="relative z-10 space-y-4 max-w-3xl">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-400/20 border border-amber-400/50 text-amber-300">
             <UserPlus className="w-3.5 h-3.5" />
-            <span>Voz da Comunidade PK XD</span>
+            <span>Indicação Oficial da Comunidade PK XD</span>
           </div>
 
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-cinzel">
@@ -119,10 +200,55 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
 
           <p className="text-zinc-300 text-sm sm:text-base leading-relaxed">
             Conhece um criador de conteúdo lendário, um beatmaker genial ou aquele jogador que cria os melhores clipes e looks?
-            Envie sua indicação oficial para a comissão do <strong>Kodo Admin</strong> avaliar e adicionar à disputa do Troféu XMA 2026!
+            Envie sua indicação oficial diretamente para a comissão organizadora avaliar!
           </p>
+
+          <div className="pt-2 flex items-center gap-2 text-xs text-amber-300/90 font-medium">
+            <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>As indicações são confidenciais e enviadas exclusivamente aos <strong>Administradores do XMA</strong>.</span>
+          </div>
         </div>
       </div>
+
+      {/* Success Alert Banner */}
+      <AnimatePresence>
+        {submittedSuccess && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            className="p-6 rounded-3xl bg-emerald-950/80 border-2 border-emerald-500/60 text-emerald-200 shadow-2xl space-y-3 relative overflow-hidden"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center shrink-0 text-emerald-300">
+                <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-white font-cinzel flex items-center gap-2">
+                  <span>Indicação de "{lastSubmittedNominee}" Enviada com Sucesso! 👑</span>
+                </h3>
+                <p className="text-xs sm:text-sm text-emerald-200/90 leading-relaxed">
+                  Sua indicação foi registrada com segurança no banco de dados e enviada diretamente para a comissão de <strong>Admins do XMA</strong>. Os administradores irão avaliar os dados e redes sociais informadas antes de oficializar o indicado nas urnas de votação.
+                </p>
+                <div className="pt-2 flex items-center gap-2 text-[11px] text-emerald-300/80 font-mono">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Envio privado • Apenas os Administradores têm acesso a esta indicação</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSubmittedSuccess(false)}
+                className="px-4 py-1.5 rounded-xl bg-emerald-900/60 hover:bg-emerald-800 text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                Enviar Outra Indicação
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Grid: Form + Live Card Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -138,7 +264,7 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
                   <Award className="w-4 h-4" />
                 </div>
                 <h2 className="text-lg font-bold text-white font-cinzel">
-                  Formulário de Indicação Oficial
+                  Formulário de Indicação
                 </h2>
               </div>
               <span className="text-[11px] text-amber-400 font-semibold uppercase">
@@ -146,32 +272,47 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
               </span>
             </div>
 
+            {/* Validation Alert */}
+            {validationError && (
+              <div className="p-4 rounded-2xl bg-red-950/80 border-2 border-red-500/60 text-red-200 text-xs font-semibold flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-white">Atenção no Preenchimento</div>
+                  <div className="text-red-200/90 mt-0.5">{validationError}</div>
+                </div>
+              </div>
+            )}
+
             {/* Submitter Info */}
             <div className="space-y-3 p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800">
-              <label className="block text-xs font-bold uppercase tracking-wider text-amber-300">
-                1. Seus Dados de Jogador PK XD
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold uppercase tracking-wider text-amber-300">
+                  1. Seus Dados de Jogador PK XD
+                </label>
+                <span className="text-[10px] text-zinc-400 font-mono">Ex: Admin#000, Nimda#000, Koosh#000</span>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div>
-                  <label className="block text-zinc-400 mb-1">Seu Nickname</label>
+                  <label className="block text-zinc-400 mb-1 font-semibold">Seu Nickname *</label>
                   <input
                     type="text"
                     required
                     value={formData.submittedByName}
                     onChange={(e) => setFormData({ ...formData, submittedByName: e.target.value })}
-                    placeholder="Ex: Bia Gamer"
+                    placeholder="Ex: Pedro Gamer, Koosh, Nimda..."
                     className="w-full px-3.5 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-zinc-400 mb-1">Sua #Tag PK XD</label>
+                  <label className="block text-zinc-400 mb-1 font-semibold">Sua #Tag PK XD</label>
                   <input
                     type="text"
                     value={formData.submittedByPkxdId}
                     onChange={(e) => setFormData({ ...formData, submittedByPkxdId: e.target.value })}
-                    placeholder="Ex: #BIA4410"
-                    className="w-full px-3.5 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
+                    placeholder="Ex: Admin#000, Nimda#000, Koosh#000"
+                    className="w-full px-3.5 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 font-mono"
                   />
                 </div>
               </div>
@@ -191,88 +332,196 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
                     required
                     value={formData.nomineeName}
                     onChange={(e) => setFormData({ ...formData, nomineeName: e.target.value })}
-                    placeholder="Ex: Pedro Astro"
+                    placeholder="Ex: Kawan XD, Bia Gamer, Luluca..."
                     className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-zinc-400 mb-1 font-semibold">Handle / Canal (@) *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.nomineeHandle}
-                    onChange={(e) => setFormData({ ...formData, nomineeHandle: e.target.value })}
-                    placeholder="@pedroastro_xd"
-                    className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-zinc-400 mb-1 font-semibold">ID / Tag no PK XD</label>
+                  <label className="block text-zinc-400 mb-1 font-semibold">Tag / ID no PK XD</label>
                   <input
                     type="text"
                     value={formData.nomineePkxdId}
                     onChange={(e) => setFormData({ ...formData, nomineePkxdId: e.target.value })}
-                    placeholder="#PEDRO9900"
-                    className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
+                    placeholder="Ex: Admin#000, Nimda#000, Koosh#000"
+                    className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 font-mono"
                   />
                 </div>
 
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-zinc-400 mb-1 font-semibold">Categoria de Premiação *</label>
                   <select
                     value={formData.categoryId}
                     onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
+                    className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 cursor-pointer"
                   >
                     {categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.title}</option>
+                      <option key={c.id} value={c.id}>🏆 {c.title}</option>
                     ))}
                   </select>
                 </div>
 
+                {/* 3 Redes Sociais: Instagram, TikTok, YouTube (Pelo menos UMA obrigatória) */}
+                <div className="sm:col-span-2 p-4 rounded-2xl bg-zinc-900/80 border-2 border-amber-500/40 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <div className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Redes Sociais do Indicado (Obrigatório ao menos 1) *</span>
+                    </div>
+                    <span className="text-[10px] text-amber-400/90 font-medium">
+                      Pode preencher as três
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-zinc-400">
+                    Informe onde o público e a comissão podem acompanhar os conteúdos do indicado:
+                  </p>
+
+                  <div className="space-y-2.5 pt-1">
+                    {/* Instagram */}
+                    <div>
+                      <label className="block text-[11px] text-zinc-300 font-semibold mb-1 flex items-center gap-1.5">
+                        <Instagram className="w-3.5 h-3.5 text-pink-400" />
+                        <span>Instagram</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.instagram}
+                        onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
+                        placeholder="Ex: @nomedocriador ou https://instagram.com/..."
+                        className="w-full px-3.5 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 placeholder:text-zinc-600"
+                      />
+                    </div>
+
+                    {/* TikTok */}
+                    <div>
+                      <label className="block text-[11px] text-zinc-300 font-semibold mb-1 flex items-center gap-1.5">
+                        <Video className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>TikTok</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.tiktok}
+                        onChange={(e) => setFormData({ ...formData, tiktok: e.target.value })}
+                        placeholder="Ex: @nomedocriador ou https://tiktok.com/@..."
+                        className="w-full px-3.5 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 placeholder:text-zinc-600"
+                      />
+                    </div>
+
+                    {/* YouTube */}
+                    <div>
+                      <label className="block text-[11px] text-zinc-300 font-semibold mb-1 flex items-center gap-1.5">
+                        <Youtube className="w-3.5 h-3.5 text-red-500" />
+                        <span>YouTube</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.youtube}
+                        onChange={(e) => setFormData({ ...formData, youtube: e.target.value })}
+                        placeholder="Ex: @nomedocanal ou https://youtube.com/@..."
+                        className="w-full px-3.5 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 placeholder:text-zinc-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Photo / Avatar Section (Upload file or URL) */}
+                <div className="sm:col-span-2 p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Foto do Indicado (Opcional - Enviar Foto Real ou Link)</span>
+                    </label>
+                    {formData.avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        className="text-[11px] text-red-400 hover:text-red-300 flex items-center gap-1 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                        <span>Remover Foto</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-zinc-400">
+                    Você pode escolher uma foto do seu dispositivo ou colar o link de uma imagem do criador:
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {/* File Upload */}
+                    <div>
+                      <label className="block text-[11px] text-zinc-300 font-semibold mb-1">
+                        1. Escolher Foto do Aparelho / PC
+                      </label>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/*"
+                        onChange={handleImageFileChange}
+                        className="w-full text-[11px] text-zinc-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-500/20 file:text-amber-300 hover:file:bg-amber-500/30 cursor-pointer bg-black/60 p-1.5 rounded-xl border border-zinc-700"
+                      />
+                    </div>
+
+                    {/* URL Input */}
+                    <div>
+                      <label className="block text-[11px] text-zinc-300 font-semibold mb-1">
+                        2. Ou Colar Link Direto da Foto (URL)
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.avatarUrl.startsWith('data:') ? '' : formData.avatarUrl}
+                        onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
+                        placeholder="https://exemplo.com/foto.jpg"
+                        className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 placeholder:text-zinc-600"
+                      />
+                    </div>
+                  </div>
+
+                  {formData.avatarUrl && (
+                    <div className="flex items-center gap-3 pt-2">
+                      <img
+                        src={formData.avatarUrl}
+                        alt="Prévia da Foto"
+                        className="w-12 h-12 rounded-xl object-cover border-2 border-amber-400"
+                      />
+                      <span className="text-[11px] text-emerald-300 font-semibold">
+                        ✓ Foto carregada e pronta para a prévia!
+                      </span>
+                    </div>
+                  )}
+                </div>
+
                 <div className="sm:col-span-2">
-                  <label className="block text-zinc-400 mb-1 font-semibold">Título do Trabalho / Clipe / Série</label>
+                  <label className="block text-zinc-400 mb-1 font-semibold">Título do Trabalho / Clipe / Produção (Opcional)</label>
                   <input
                     type="text"
                     value={formData.workTitle}
                     onChange={(e) => setFormData({ ...formData, workTitle: e.target.value })}
-                    placeholder="Ex: Série Mansão Mal-Assombrada / Hit Beat Ilha"
+                    placeholder="Ex: Série Mansão Mal-Assombrada / Clipe Oficial / Melhores Gameplays"
                     className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-zinc-400 mb-1 font-semibold">Link do Vídeo / Conteúdo (YouTube / TikTok / Canal)</label>
+                  <label className="block text-zinc-400 mb-1 font-semibold">Link do Vídeo / Conteúdo em Destaque (Opcional)</label>
                   <input
                     type="url"
                     value={formData.workUrl}
                     onChange={(e) => setFormData({ ...formData, workUrl: e.target.value })}
-                    placeholder="https://youtube.com/watch?v=..."
+                    placeholder="https://youtube.com/watch?v=... ou https://tiktok.com/..."
                     className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
                   />
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-zinc-400 mb-1 font-semibold">Foto / Avatar URL do Indicado (Opcional)</label>
-                  <input
-                    type="url"
-                    value={formData.avatarUrl}
-                    onChange={(e) => setFormData({ ...formData, avatarUrl: e.target.value })}
-                    placeholder="https://..."
-                    className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-zinc-400 mb-1 font-semibold">Por que ele merece concorrer ao Troféu XMA? *</label>
+                  <label className="block text-zinc-400 mb-1 font-semibold">Por que este criador merece concorrer ao Troféu XMA? *</label>
                   <textarea
                     required
                     rows={3}
                     value={formData.reason}
                     onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                    placeholder="Conte para os jurados o impacto deste criador, o engajamento e porque a comunidade ama seu conteúdo..."
+                    placeholder="Conte para a comissão de jurados o impacto deste criador, o talento, carisma e porque ele merece concorrer..."
                     className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 text-xs"
                   />
                 </div>
@@ -280,36 +529,20 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
             </div>
 
             {/* Submit Action */}
-            <div className="pt-2">
+            <div className="pt-2 space-y-2">
               <button
                 type="submit"
                 id="submit-nomination-btn"
-                className="w-full py-3.5 px-6 rounded-2xl bg-gold-metallic-btn text-black font-extrabold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/20 hover:scale-[1.01] transition-transform"
+                className="w-full py-4 px-6 rounded-2xl bg-gold-metallic-btn text-black font-extrabold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-xl shadow-amber-500/20 hover:scale-[1.01] transition-transform"
               >
                 <Send className="w-4 h-4" />
-                <span>Enviar Indicação para o Kodo Admin</span>
+                <span>Enviar Indicação aos Admins do XMA</span>
               </button>
-            </div>
 
-            {/* Success Alert */}
-            <AnimatePresence>
-              {submittedSuccess && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="p-4 rounded-2xl bg-emerald-500/20 border border-emerald-400/60 text-emerald-300 text-xs font-bold flex items-center gap-3"
-                >
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <div>
-                    <div className="text-sm font-bold text-white">Indicação Enviada com Sucesso! 👑</div>
-                    <div className="text-emerald-200/90 font-normal">
-                      Sua indicação foi registrada no banco de dados da comissão e já pode receber apoios da comunidade abaixo.
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+              <div className="text-center text-[11px] text-zinc-500">
+                🔒 Envio seguro • Visualização restrita exclusivamente aos administradores oficiais do XMA
+              </div>
+            </div>
           </form>
         </div>
 
@@ -326,152 +559,92 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
               </span>
             </div>
 
-            {/* Mock Card */}
+            {/* Real Card Preview */}
             <div className="p-5 rounded-2xl bg-[#181924] border-2 border-amber-400/60 space-y-4 shadow-xl">
               <div className="flex items-center gap-3.5">
-                <img
-                  src={formData.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80'}
-                  alt="Nominee Avatar"
-                  className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 shadow-md bg-zinc-900"
-                />
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-extrabold text-white font-cinzel">
+                {formData.avatarUrl ? (
+                  <img
+                    src={formData.avatarUrl}
+                    alt="Nominee Avatar"
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 shadow-md bg-zinc-900"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 via-amber-200 to-amber-600 p-[1.5px] shadow-md shrink-0">
+                    <div className="w-full h-full bg-[#0d0e14] rounded-[14px] flex items-center justify-center font-cinzel font-black text-amber-300 text-lg">
+                      {getInitials(formData.nomineeName)}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-extrabold text-white font-cinzel truncate">
                       {formData.nomineeName || 'Nome do Indicado'}
                     </h3>
                     <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/60 border border-zinc-700 text-amber-300">
-                      {formData.nomineePkxdId || '#PKXD0000'}
+                      {formData.nomineePkxdId || '#Admin000'}
                     </span>
                   </div>
-                  <p className="text-xs text-amber-400 font-semibold">
-                    {formData.nomineeHandle || '@handle_do_criador'}
-                  </p>
-                  <span className="inline-block text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                    {selectedCategoryObj?.title || 'Categoria XMA'}
+
+                  {/* Social Badges Preview */}
+                  <div className="flex items-center gap-2 flex-wrap text-xs text-amber-400 font-semibold">
+                    {formData.instagram && (
+                      <span className="flex items-center gap-1 text-[11px] text-pink-400">
+                        <Instagram className="w-3 h-3" />
+                        <span className="truncate max-w-[120px]">{formData.instagram}</span>
+                      </span>
+                    )}
+                    {formData.tiktok && (
+                      <span className="flex items-center gap-1 text-[11px] text-cyan-400">
+                        <Video className="w-3 h-3" />
+                        <span className="truncate max-w-[120px]">{formData.tiktok}</span>
+                      </span>
+                    )}
+                    {formData.youtube && (
+                      <span className="flex items-center gap-1 text-[11px] text-red-400">
+                        <Youtube className="w-3 h-3" />
+                        <span className="truncate max-w-[120px]">{formData.youtube}</span>
+                      </span>
+                    )}
+                    {!formData.instagram && !formData.tiktok && !formData.youtube && (
+                      <span className="text-[11px] text-zinc-500 italic">
+                        Instagram / TikTok / YouTube
+                      </span>
+                    )}
+                  </div>
+
+                  <span className="inline-block text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 truncate max-w-[220px]">
+                    {selectedCategoryObj?.title || 'Categoria XMA 2026'}
                   </span>
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-black/50 border border-zinc-800 space-y-1.5 text-xs">
+              <div className="p-3.5 rounded-xl bg-black/50 border border-zinc-800 space-y-1.5 text-xs">
                 <div className="font-bold text-zinc-200">
-                  {formData.workTitle || 'Título do Trabalho / Clipe Indicado'}
+                  {formData.workTitle || 'Trabalho / Produção em Destaque'}
                 </div>
-                <p className="text-zinc-400 text-[11px] line-clamp-3">
-                  {formData.reason || 'O motivo da indicação aparecerá aqui detalhando os motivos de o indicado merecer o troféu de gala...'}
+                <p className="text-zinc-400 text-[11px] line-clamp-3 leading-relaxed">
+                  {formData.reason || 'O motivo da indicação aparecerá aqui com os detalhes informados no formulário...'}
                 </p>
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-2 border-t border-zinc-800">
-                <span>Indicado por: <strong>{formData.submittedByName || 'Você'}</strong></span>
-                <span className="text-amber-400 font-bold">XMA 2026 Oficial</span>
+                <span>Indicado por: <strong>{formData.submittedByName || 'Jogador PK XD'}</strong> ({formData.submittedByPkxdId || 'Admin#000'})</span>
+                <span className="text-amber-400 font-bold">XMA 2026</span>
               </div>
             </div>
 
-            <div className="text-xs text-zinc-400 space-y-2 p-3 rounded-2xl bg-zinc-900/50 border border-zinc-800">
-              <div className="font-bold text-zinc-200 flex items-center gap-1.5">
-                <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
-                <span>Como funciona a aprovação?</span>
+            {/* Privacy & Admin Process Card */}
+            <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-2 text-xs">
+              <div className="font-bold text-amber-300 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <span>Privacidade & Avaliação dos Admins</span>
               </div>
               <p className="text-[11px] text-zinc-400 leading-relaxed">
-                Todas as indicações chegam diretamente no <strong>Kodo Admin Center</strong>. O comitê analisa as mais apoiadas pela torcida e adiciona oficialmente às urnas de votação!
+                As indicações enviadas pelo público <strong>não são visíveis para outros jogadores</strong>. Elas são enviadas diretamente ao <strong>Painel dos Admins XMA</strong>, onde os organizadores avaliam os perfis das redes sociais e oficializam os concorrentes nas categorias da premiação.
               </p>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Community Feed of Submissions */}
-      <div className="space-y-6 pt-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
-          <div>
-            <h2 className="text-2xl font-extrabold text-white font-cinzel">
-              Mural de Indicações da Comunidade
-            </h2>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              Veja quem a comunidade está pedindo no palco do XMA e deixe seu apoio (+1 Curtida) para ajudar a oficializar o indicado!
-            </p>
-          </div>
-
-          {/* Category Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-zinc-400 font-semibold">Filtrar:</span>
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400"
-            >
-              <option value="all">Todas as Categorias ({nominations.length})</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.title}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Nominations Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredNominations.map((nom) => (
-            <motion.div
-              key={nom.id}
-              layout
-              className="p-5 rounded-2xl bg-[#13141d] border border-zinc-800 hover:border-amber-500/50 transition-all flex flex-col justify-between space-y-4 shadow-lg"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 truncate max-w-[200px]">
-                    {nom.categoryTitle || 'Categoria XMA'}
-                  </span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                    nom.status === 'approved'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : 'bg-zinc-800 text-zinc-400'
-                  }`}>
-                    {nom.status === 'approved' ? '✓ Oficializado' : 'Em Avaliação'}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <img
-                    src={nom.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80'}
-                    alt={nom.nomineeName}
-                    className="w-12 h-12 rounded-xl object-cover border border-amber-400/40 bg-zinc-900"
-                  />
-                  <div>
-                    <h3 className="font-bold text-white text-base font-cinzel">
-                      {nom.nomineeName}
-                    </h3>
-                    <p className="text-xs text-amber-400 font-medium">
-                      {nom.nomineeHandle} <span className="text-zinc-400 font-mono text-[10px]">{nom.nomineePkxdId}</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl bg-black/60 border border-zinc-800/80 space-y-1 text-xs">
-                  <div className="font-bold text-zinc-200 truncate">
-                    {nom.workTitle}
-                  </div>
-                  <p className="text-zinc-400 text-[11px] line-clamp-3 leading-relaxed">
-                    "{nom.reason}"
-                  </p>
-                </div>
-              </div>
-
-              {/* Footer / Community Support Button */}
-              <div className="pt-3 border-t border-zinc-800 flex items-center justify-between text-xs">
-                <div className="text-[11px] text-zinc-400">
-                  Por: <span className="text-zinc-300 font-semibold">{nom.submittedByName}</span>
-                </div>
-
-                <button
-                  onClick={() => onLikeNomination(nom.id)}
-                  className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-amber-500/20 hover:text-amber-300 text-zinc-300 border border-zinc-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
-                >
-                  <ThumbsUp className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Apoiar ({nom.communityLikes})</span>
-                </button>
-              </div>
-            </motion.div>
-          ))}
         </div>
       </div>
     </div>

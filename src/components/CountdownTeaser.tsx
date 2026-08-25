@@ -25,7 +25,14 @@ import {
   MessageSquare,
   PlusCircle,
   Lightbulb,
-  Check
+  Check,
+  Instagram,
+  Video,
+  Youtube,
+  Lock,
+  Image as ImageIcon,
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { Category, CommunityNomination, isAuthorizedAdminEmail } from '../types';
 import { playClockTick, playGrandReveal, playSlideWhoosh, playVoteChime, playFanfare, playAdminGavel } from '../utils/audio';
@@ -90,39 +97,62 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
   // Nomination form state in countdown screen
   const [nominationTab, setNominationTab] = useState<'creator' | 'category'>('creator');
   const [nomineeName, setNomineeName] = useState('');
-  const [nomineeHandle, setNomineeHandle] = useState('');
   const [nomineePkxdId, setNomineePkxdId] = useState('');
+  const [nomineeInstagram, setNomineeInstagram] = useState('');
+  const [nomineeTiktok, setNomineeTiktok] = useState('');
+  const [nomineeYoutube, setNomineeYoutube] = useState('');
+  const [nomineeAvatarUrl, setNomineeAvatarUrl] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState(categories[0]?.id || 'cat-creator-ano');
   const [customCategoryName, setCustomCategoryName] = useState('');
   const [nominationReason, setNominationReason] = useState('');
   const [senderName, setSenderName] = useState(userNickname || '');
-  const [senderPkxdTag, setSenderPkxdTag] = useState(userPkxdTag || '#PKXD');
+  const [senderPkxdTag, setSenderPkxdTag] = useState(userPkxdTag || '');
   const [showSuccessBadge, setShowSuccessBadge] = useState(false);
-  const [localLikedMap, setLocalLikedMap] = useState<Record<string, boolean>>({});
+  const [nominationValidationError, setNominationValidationError] = useState<string | null>(null);
+  const countdownFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleNominationSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setNominationValidationError(null);
 
     if (nominationTab === 'creator') {
-      if (!nomineeName.trim()) return;
+      if (!nomineeName.trim()) {
+        setNominationValidationError('Informe o nome do criador ou astro indicado.');
+        return;
+      }
+
+      // Mandatory: At least one of Instagram, TikTok, or YouTube
+      const hasIg = nomineeInstagram.trim().length > 0;
+      const hasTt = nomineeTiktok.trim().length > 0;
+      const hasYt = nomineeYoutube.trim().length > 0;
+
+      if (!hasIg && !hasTt && !hasYt) {
+        setNominationValidationError('É obrigatório informar ao menos uma rede social do indicado (Instagram, TikTok ou YouTube).');
+        return;
+      }
+
       const targetCat = categories.find((c) => c.id === selectedCategoryId);
       const catTitle = targetCat?.title || 'Categoria XMA 2026';
 
+      let primaryHandle = '';
+      if (hasIg) primaryHandle = nomineeInstagram.trim().startsWith('@') ? nomineeInstagram.trim() : `@${nomineeInstagram.trim()}`;
+      else if (hasTt) primaryHandle = nomineeTiktok.trim().startsWith('@') ? nomineeTiktok.trim() : `@${nomineeTiktok.trim()}`;
+      else if (hasYt) primaryHandle = nomineeYoutube.trim().startsWith('@') ? nomineeYoutube.trim() : `@${nomineeYoutube.trim()}`;
+
       const newNom: Omit<CommunityNomination, 'id' | 'createdAt' | 'status' | 'communityLikes'> = {
         submittedByName: senderName.trim() || 'Jogador PK XD',
-        submittedByPkxdId: senderPkxdTag.trim() || '#PKXD',
+        submittedByPkxdId: senderPkxdTag.trim() ? (senderPkxdTag.trim().startsWith('#') ? senderPkxdTag.trim() : `#${senderPkxdTag.trim()}`) : '#000',
         nomineeName: nomineeName.trim(),
-        nomineeHandle: nomineeHandle.trim().startsWith('@') 
-          ? nomineeHandle.trim() 
-          : (nomineeHandle.trim() ? `@${nomineeHandle.trim()}` : '@criador_pkxd'),
-        nomineePkxdId: nomineePkxdId.trim().startsWith('#') 
-          ? nomineePkxdId.trim() 
-          : (nomineePkxdId.trim() ? `#${nomineePkxdId.trim()}` : '#0000'),
+        nomineeHandle: primaryHandle,
+        nomineePkxdId: nomineePkxdId.trim() ? (nomineePkxdId.trim().startsWith('#') ? nomineePkxdId.trim() : `#${nomineePkxdId.trim()}`) : '#000',
+        instagram: nomineeInstagram.trim() || undefined,
+        tiktok: nomineeTiktok.trim() || undefined,
+        youtube: nomineeYoutube.trim() || undefined,
         categoryId: selectedCategoryId,
         categoryTitle: catTitle,
         workTitle: nominationReason.trim() || 'Indicação Oficial da Comunidade',
         reason: nominationReason.trim() || 'Destaque e talento no universo PK XD',
-        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80'
+        avatarUrl: nomineeAvatarUrl.trim() || undefined
       };
 
       if (onSubmitNomination) {
@@ -130,18 +160,20 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
       }
     } else {
       // Suggesting category
-      if (!customCategoryName.trim()) return;
+      if (!customCategoryName.trim()) {
+        setNominationValidationError('Informe o nome da categoria sugerida.');
+        return;
+      }
       const newNom: Omit<CommunityNomination, 'id' | 'createdAt' | 'status' | 'communityLikes'> = {
         submittedByName: senderName.trim() || 'Jogador PK XD',
-        submittedByPkxdId: senderPkxdTag.trim() || '#PKXD',
+        submittedByPkxdId: senderPkxdTag.trim() ? (senderPkxdTag.trim().startsWith('#') ? senderPkxdTag.trim() : `#${senderPkxdTag.trim()}`) : '#000',
         nomineeName: customCategoryName.trim(),
         nomineeHandle: '@sugestao_categoria',
         nomineePkxdId: '#XMA2026',
         categoryId: 'cat-sugestao-comunidade',
         categoryTitle: `[NOVA CATEGORIA] ${customCategoryName.trim()}`,
         workTitle: `Sugestão de Categoria: ${customCategoryName.trim()}`,
-        reason: nominationReason.trim() || 'Sugestão de nova categoria proposta pela comunidade para a gala oficial',
-        avatarUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80'
+        reason: nominationReason.trim() || 'Sugestão de nova categoria proposta pela comunidade para a gala oficial'
       };
 
       if (onSubmitNomination) {
@@ -156,25 +188,20 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
 
     setShowSuccessBadge(true);
     setNomineeName('');
-    setNomineeHandle('');
     setNomineePkxdId('');
+    setNomineeInstagram('');
+    setNomineeTiktok('');
+    setNomineeYoutube('');
+    setNomineeAvatarUrl('');
     setCustomCategoryName('');
     setNominationReason('');
+    if (countdownFileInputRef.current) {
+      countdownFileInputRef.current.value = '';
+    }
 
     setTimeout(() => {
       setShowSuccessBadge(false);
     }, 6000);
-  };
-
-  const handleLike = (nomId: string) => {
-    if (localLikedMap[nomId]) return;
-    setLocalLikedMap((prev) => ({ ...prev, [nomId]: true }));
-    if (onLikeNomination) {
-      onLikeNomination(nomId);
-    }
-    try {
-      playVoteChime();
-    } catch {}
   };
 
   // Admin Modal & State
@@ -745,6 +772,17 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
               </button>
             </div>
 
+            {/* Validation Alert */}
+            {nominationValidationError && (
+              <div className="mt-4 p-4 rounded-2xl bg-red-950/80 border-2 border-red-500/60 text-red-200 text-xs font-semibold flex items-start gap-3 relative z-10">
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-bold text-white">Atenção no Preenchimento</div>
+                  <div className="text-red-200/90 mt-0.5">{nominationValidationError}</div>
+                </div>
+              </div>
+            )}
+
             {/* Success Alert */}
             <AnimatePresence>
               {showSuccessBadge && (
@@ -759,10 +797,10 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                   </div>
                   <div>
                     <h4 className="text-xs sm:text-sm font-black text-emerald-300">
-                      Indicação Enviada com Sucesso!
+                      Indicação Enviada com Sucesso! 👑
                     </h4>
                     <p className="text-[11px] text-emerald-200/90 mt-0.5">
-                      Sua indicação foi registrada no banco oficial e enviada para a comissão organizadora do XMA 2026.
+                      Sua indicação foi registrada com segurança e enviada diretamente para a comissão de <strong>Admins do XMA</strong>.
                     </p>
                   </div>
                 </motion.div>
@@ -789,17 +827,17 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                       />
                     </div>
 
-                    {/* Nominee Handle / PK XD Tag */}
+                    {/* Nominee PK XD Tag */}
                     <div>
                       <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                        @ do Canal ou #Tag PK XD
+                        #Tag PK XD do Indicado
                       </label>
                       <input
                         type="text"
-                        value={nomineeHandle}
-                        onChange={(e) => setNomineeHandle(e.target.value)}
-                        placeholder="Ex: @kawan_oficial ou #0000"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
+                        value={nomineePkxdId}
+                        onChange={(e) => setNomineePkxdId(e.target.value)}
+                        placeholder="Ex: Admin#000, Nimda#000, Koosh#000"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all font-mono"
                       />
                     </div>
                   </div>
@@ -829,6 +867,113 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                         </>
                       )}
                     </select>
+                  </div>
+
+                  {/* 3 Redes Sociais: Instagram, TikTok, YouTube (Pelo menos UMA obrigatória) */}
+                  <div className="p-3.5 rounded-2xl bg-zinc-950/90 border-2 border-amber-500/40 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Redes Sociais do Indicado (Obrigatório ao menos 1) *</span>
+                      </label>
+                      <span className="text-[10px] text-amber-400/90">Pode preencher as 3</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div>
+                        <div className="text-[10px] font-semibold text-zinc-300 mb-0.5 flex items-center gap-1">
+                          <Instagram className="w-3 h-3 text-pink-400" /> Instagram
+                        </div>
+                        <input
+                          type="text"
+                          value={nomineeInstagram}
+                          onChange={(e) => setNomineeInstagram(e.target.value)}
+                          placeholder="Ex: @criador ou link do Instagram"
+                          className="w-full px-3 py-1.5 rounded-xl bg-black border border-zinc-700/80 focus:border-amber-400 text-white text-xs placeholder:text-zinc-600 outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] font-semibold text-zinc-300 mb-0.5 flex items-center gap-1">
+                          <Video className="w-3 h-3 text-cyan-400" /> TikTok
+                        </div>
+                        <input
+                          type="text"
+                          value={nomineeTiktok}
+                          onChange={(e) => setNomineeTiktok(e.target.value)}
+                          placeholder="Ex: @criador ou link do TikTok"
+                          className="w-full px-3 py-1.5 rounded-xl bg-black border border-zinc-700/80 focus:border-amber-400 text-white text-xs placeholder:text-zinc-600 outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="text-[10px] font-semibold text-zinc-300 mb-0.5 flex items-center gap-1">
+                          <Youtube className="w-3 h-3 text-red-500" /> YouTube
+                        </div>
+                        <input
+                          type="text"
+                          value={nomineeYoutube}
+                          onChange={(e) => setNomineeYoutube(e.target.value)}
+                          placeholder="Ex: @canal ou link do YouTube"
+                          className="w-full px-3 py-1.5 rounded-xl bg-black border border-zinc-700/80 focus:border-amber-400 text-white text-xs placeholder:text-zinc-600 outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Nominee Photo (Upload or URL) */}
+                  <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-zinc-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-amber-300/90 flex items-center gap-1.5">
+                        <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Foto do Indicado (Opcional - Real ou Link)</span>
+                      </label>
+                      {nomineeAvatarUrl && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setNomineeAvatarUrl('');
+                            if (countdownFileInputRef.current) countdownFileInputRef.current.value = '';
+                          }}
+                          className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <X className="w-3 h-3" /> Remover
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="file"
+                        ref={countdownFileInputRef}
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            if (ev.target?.result) setNomineeAvatarUrl(String(ev.target.result));
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                        className="w-full text-[10px] text-zinc-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-amber-500/20 file:text-amber-300 cursor-pointer bg-black/60 p-1 rounded-xl border border-zinc-700"
+                      />
+
+                      <input
+                        type="url"
+                        value={nomineeAvatarUrl.startsWith('data:') ? '' : nomineeAvatarUrl}
+                        onChange={(e) => setNomineeAvatarUrl(e.target.value)}
+                        placeholder="Ou cole o link da foto..."
+                        className="w-full px-3 py-1.5 rounded-xl bg-black border border-zinc-700/80 focus:border-amber-400 text-white text-xs placeholder:text-zinc-600 outline-none"
+                      />
+                    </div>
+
+                    {nomineeAvatarUrl && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <img src={nomineeAvatarUrl} alt="Prévia" className="w-8 h-8 rounded-lg object-cover border border-amber-400" />
+                        <span className="text-[10px] text-emerald-300 font-semibold">✓ Foto carregada para envio!</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Reason / Work */}
@@ -887,7 +1032,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                     type="text"
                     value={senderName}
                     onChange={(e) => setSenderName(e.target.value)}
-                    placeholder="Ex: Kawan, Jogador XD..."
+                    placeholder="Ex: Pedro, Kawan, Jogador XD..."
                     className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
                   />
                 </div>
@@ -899,8 +1044,8 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                     type="text"
                     value={senderPkxdTag}
                     onChange={(e) => setSenderPkxdTag(e.target.value)}
-                    placeholder="Ex: #0000 ou #PLAYER"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
+                    placeholder="Ex: Admin#000, Nimda#000, Koosh#000"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all font-mono"
                   />
                 </div>
               </div>
@@ -914,66 +1059,13 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                 <span>{nominationTab === 'creator' ? 'Enviar Indicação de Criador' : 'Enviar Sugestão de Categoria'}</span>
                 <Sparkles className="w-4 h-4 text-black" />
               </button>
-            </form>
 
-            {/* Community Live Feed (Recent Nominations) */}
-            {communityNominations.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-zinc-800/80 space-y-3 relative z-10">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-300/90 flex items-center gap-1.5 font-cinzel">
-                    <Users className="w-3.5 h-3.5" />
-                    <span>Últimas Indicações da Galera ({communityNominations.length})</span>
-                  </h4>
-                  <span className="text-[10px] text-zinc-500 font-mono">Atualizado em tempo real</span>
-                </div>
-
-                <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-                  {communityNominations.slice(0, 6).map((nom) => {
-                    const isLiked = Boolean(localLikedMap[nom.id]);
-                    const currentLikes = nom.communityLikes + (isLiked ? 1 : 0);
-
-                    return (
-                      <div
-                        key={nom.id}
-                        className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 hover:border-amber-400/30 transition-all flex items-center justify-between gap-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-xs text-white truncate">
-                              {nom.nomineeName}
-                            </span>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 truncate">
-                              {nom.categoryTitle || 'Categoria XMA'}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-zinc-400 truncate mt-0.5">
-                            {nom.reason || nom.workTitle}
-                          </p>
-                          <p className="text-[10px] text-zinc-500 mt-0.5">
-                            Indicado por: <span className="text-zinc-300">{nom.submittedByName}</span> ({nom.submittedByPkxdId})
-                          </p>
-                        </div>
-
-                        {/* Like/Support Button */}
-                        <button
-                          type="button"
-                          onClick={() => handleLike(nom.id)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                            isLiked
-                              ? 'bg-rose-500/20 text-rose-300 border border-rose-400/40 shadow-sm'
-                              : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-rose-300 border border-zinc-700'
-                          }`}
-                          title="Apoiar esta indicação"
-                        >
-                          <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-rose-400 text-rose-400' : ''}`} />
-                          <span>{currentLikes}</span>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+              {/* Confidentiality notice */}
+              <div className="pt-2 flex items-center justify-center gap-1.5 text-[11px] text-zinc-400 text-center">
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Indicação sigilosa enviada exclusivamente para a comissão de <strong>Admins do XMA</strong></span>
               </div>
-            )}
+            </form>
           </motion.div>
         </main>
       )}

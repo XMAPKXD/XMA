@@ -35,7 +35,10 @@ import {
   LogIn,
   Check,
   BarChart3,
-  Activity
+  Activity,
+  Instagram,
+  Video,
+  Youtube
 } from 'lucide-react';
 import { triggerWinnerTrophyBlast, triggerGoldenConfetti } from '../utils/confetti';
 import { playFanfare, playAdminGavel, playVoteChime } from '../utils/audio';
@@ -326,17 +329,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ? nom.categoryId
       : categories[0]?.id || 'cat-revelacao-ano';
 
+    const cleanHandle = nom.nomineeHandle || (nom.instagram ? `@${nom.instagram.replace('@', '')}` : nom.tiktok ? `@${nom.tiktok.replace('@', '')}` : '@pkxd_creator');
+
     const newNom: Nominee = {
       id: `nom-${Date.now()}`,
       name: nom.nomineeName,
-      handle: nom.nomineeHandle,
-      avatarUrl: nom.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
+      handle: cleanHandle,
+      avatarUrl: nom.avatarUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80',
       categoryId: targetCatId,
       projectTitle: nom.workTitle || 'Trabalho Aprovado pela Comunidade',
       projectDescription: nom.reason || 'Indicado oficial sugerido pelos fãs.',
       projectType: 'media_creator',
       votes: 2500,
-      pkxdId: nom.nomineePkxdId || '#PKXD99',
+      pkxdId: nom.nomineePkxdId || '#Admin000',
       bio: nom.reason,
       badge: 'Voz da Comunidade'
     };
@@ -1120,24 +1125,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <img
-                            src={nom.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80'}
-                            alt={nom.nomineeName}
-                            className="w-12 h-12 rounded-xl object-cover border border-zinc-700"
-                          />
+                          {nom.avatarUrl ? (
+                            <img
+                              src={nom.avatarUrl}
+                              alt={nom.nomineeName}
+                              className="w-12 h-12 rounded-xl object-cover border border-amber-400/60"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center font-bold text-amber-300 text-sm">
+                              {nom.nomineeName.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
                           <div>
                             <h3 className="text-base font-bold text-white font-cinzel">
                               {nom.nomineeName}
                             </h3>
-                            <p className="text-amber-400 font-semibold">
-                              {nom.nomineeHandle} • {nom.nomineePkxdId}
+                            <p className="text-amber-400 font-semibold font-mono text-[11px]">
+                              {nom.nomineePkxdId || nom.nomineeHandle}
                             </p>
                           </div>
                         </div>
 
+                        {/* Social Media Links */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {nom.instagram && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-pink-950/60 border border-pink-500/40 text-pink-300 text-[10px] font-medium">
+                              <Instagram className="w-3 h-3 text-pink-400" />
+                              <span>{nom.instagram}</span>
+                            </span>
+                          )}
+                          {nom.tiktok && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 text-[10px] font-medium">
+                              <Video className="w-3 h-3 text-cyan-400" />
+                              <span>{nom.tiktok}</span>
+                            </span>
+                          )}
+                          {nom.youtube && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-red-950/60 border border-red-500/40 text-red-300 text-[10px] font-medium">
+                              <Youtube className="w-3 h-3 text-red-500" />
+                              <span>{nom.youtube}</span>
+                            </span>
+                          )}
+                        </div>
+
                         <div className="p-3 rounded-xl bg-black/60 border border-zinc-800 space-y-1">
                           <div className="font-bold text-zinc-200">
-                            Trabalho: {nom.workTitle}
+                            Trabalho / Motivo: {nom.workTitle || nom.categoryTitle}
                           </div>
                           <p className="text-zinc-400 text-[11px] leading-relaxed">
                             "{nom.reason}"
@@ -1145,7 +1178,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
 
                         <div className="text-[11px] text-zinc-500">
-                          Sugerido por: <strong>{nom.submittedByName}</strong> ({nom.submittedByPkxdId})
+                          Sugerido por: <strong className="text-zinc-300">{nom.submittedByName}</strong> ({nom.submittedByPkxdId})
                         </div>
                       </div>
 

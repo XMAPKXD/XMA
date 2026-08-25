@@ -52,8 +52,11 @@ export interface CommunityNomination {
   submittedByName: string;
   submittedByPkxdId: string;
   nomineeName: string;
-  nomineeHandle: string;
+  nomineeHandle?: string;
   nomineePkxdId: string;
+  instagram?: string;
+  tiktok?: string;
+  youtube?: string;
   categoryId: string;
   categoryTitle?: string;
   workTitle: string;
