@@ -1,43 +1,70 @@
 import confetti from 'canvas-confetti';
 
-export function triggerGoldenConfetti() {
-  const duration = 2.5 * 1000;
-  const end = Date.now() + duration;
+let activeConfettiTimer: number | null = null;
 
-  // Gold, Silver, Bronze & Champagne metallic sparkles
-  const colors = ['#ffd700', '#fbbf24', '#fef08a', '#e2e8f0', '#cbd5e1', '#d4af37', '#ffffff'];
+export function triggerGoldenConfetti(customZIndex = 25) {
+  // Clear any previous confetti loop to avoid particle congestion/lag
+  if (activeConfettiTimer) {
+    clearInterval(activeConfettiTimer);
+    activeConfettiTimer = null;
+  }
 
-  (function frame() {
-    confetti({
-      particleCount: 4,
-      angle: 60,
-      spread: 55,
-      origin: { x: 0, y: 0.7 },
-      colors: colors,
-      shapes: ['star', 'circle'],
-      scalar: 1.2
-    });
-    confetti({
-      particleCount: 4,
-      angle: 120,
-      spread: 55,
-      origin: { x: 1, y: 0.7 },
-      colors: colors,
-      shapes: ['star', 'circle'],
-      scalar: 1.2
-    });
+  // Ultra-luxurious champagne, soft gold, platinum & celestial sparkles
+  const colors = ['#ffe082', '#ffd54f', '#ffca28', '#ffecb3', '#fff8e1', '#ffffff', '#f59e0b'];
 
-    if (Date.now() < end) {
-      requestAnimationFrame(frame);
+  let count = 0;
+  const maxIterations = 20; // 20 pulses spaced by 120ms = ~2.4s lightweight smooth cascade
+
+  activeConfettiTimer = window.setInterval(() => {
+    count++;
+    if (count > maxIterations) {
+      if (activeConfettiTimer) {
+        clearInterval(activeConfettiTimer);
+        activeConfettiTimer = null;
+      }
+      return;
     }
-  })();
+
+    confetti({
+      particleCount: 2,
+      angle: 55,
+      spread: 45,
+      origin: { x: 0.05, y: 0.55 },
+      colors: colors,
+      shapes: ['circle', 'star'],
+      scalar: 0.9,
+      gravity: 0.65,
+      drift: 0.1,
+      ticks: 200,
+      zIndex: customZIndex,
+      disableForReducedMotion: true,
+    });
+
+    confetti({
+      particleCount: 2,
+      angle: 125,
+      spread: 45,
+      origin: { x: 0.95, y: 0.55 },
+      colors: colors,
+      shapes: ['circle', 'star'],
+      scalar: 0.9,
+      gravity: 0.65,
+      drift: -0.1,
+      ticks: 200,
+      zIndex: customZIndex,
+      disableForReducedMotion: true,
+    });
+  }, 120);
 }
 
-export function triggerWinnerTrophyBlast() {
-  const count = 200;
+export function triggerWinnerTrophyBlast(customZIndex = 25) {
+  const count = 90; // Optimized particle count for 60fps buttery smooth performance
   const defaults = {
     origin: { y: 0.6 },
-    colors: ['#ffd700', '#f59e0b', '#f8fafc', '#ffffff', '#b45309']
+    colors: ['#ffe082', '#f59e0b', '#fffbeb', '#ffffff', '#fbbf24', '#d97706'],
+    zIndex: customZIndex,
+    gravity: 0.7,
+    disableForReducedMotion: true,
   };
 
   function fire(particleRatio: number, opts: confetti.Options) {
@@ -48,26 +75,30 @@ export function triggerWinnerTrophyBlast() {
     });
   }
 
-  fire(0.25, {
-    spread: 26,
-    startVelocity: 55,
+  fire(0.3, {
+    spread: 35,
+    startVelocity: 35,
+    ticks: 200,
+    scalar: 0.9,
   });
-  fire(0.2, {
+  fire(0.3, {
     spread: 60,
+    startVelocity: 30,
+    ticks: 220,
+    scalar: 1.0,
   });
-  fire(0.35, {
-    spread: 100,
-    decay: 0.91,
-    scalar: 0.8
+  fire(0.25, {
+    spread: 90,
+    decay: 0.93,
+    scalar: 0.8,
+    ticks: 240,
   });
-  fire(0.1, {
-    spread: 120,
-    startVelocity: 25,
-    decay: 0.92,
-    scalar: 1.2
-  });
-  fire(0.1, {
-    spread: 120,
-    startVelocity: 45,
+  fire(0.15, {
+    spread: 110,
+    startVelocity: 20,
+    decay: 0.94,
+    scalar: 1.1,
+    ticks: 250,
   });
 }
+

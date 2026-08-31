@@ -32,21 +32,46 @@ export default function App() {
   // Navigation
   const [activeTab, setActiveTab] = useState<'gallery' | 'voting' | 'community_nominations' | 'ceremony' | 'admin'>('gallery');
 
-  // Site Countdown / Teaser State (Default to true, locking the site behind the countdown until revealed)
+  // Site Countdown / Teaser State (Default to true: everyone stays on countdown until admin unlocks)
   const [isCountdownActive, setIsCountdownActive] = useState<boolean>(() => {
     try {
-      const saved = localStorage.getItem('xma_countdown_active_v2');
-      return saved !== null ? saved === 'true' : true;
+      const isAdminSession = sessionStorage.getItem('xma_admin_session_unlocked') === 'true';
+      if (isAdminSession) return false;
+      const saved = localStorage.getItem('xma_countdown_active_v8');
+      return saved !== null ? saved === 'true' : true; // Default to true (locked on countdown timer)
     } catch {
       return true;
     }
   });
 
-  // Categories & Nominees State
+  // Filter out any leftover hardcoded mock IDs from earlier versions
+  const sanitizeNominees = (nominees: Nominee[]): Nominee[] => {
+    if (!Array.isArray(nominees)) return [];
+    const mockIds = new Set([
+      'nom-admin', 'nom-nimda', 'nom-koosh', 'nom-bia-gamer',
+      'nom-hit-sinfonia', 'nom-hit-dourado', 'nom-hit-crazyrun',
+      'nom-clipe-gravidade', 'nom-clipe-mansao',
+      'nom-look-ouro', 'nom-look-cyber',
+      'nom-rev-pedro', 'nom-rev-luna',
+      'nom-collab-squad'
+    ]);
+    return nominees.filter((n) => !mockIds.has(n.id));
+  };
+
+  // Categories & Nominees State (100% Admin Controlled)
   const [categories, setCategories] = useState<Category[]>(() => {
     try {
-      const saved = localStorage.getItem('xma_categories_2026_v3');
-      return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
+      const saved = localStorage.getItem('xma_categories_2026_v7');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((cat: Category) => ({
+            ...cat,
+            nominees: sanitizeNominees(cat.nominees || [])
+          }));
+        }
+      }
+      return INITIAL_CATEGORIES;
     } catch {
       return INITIAL_CATEGORIES;
     }
@@ -55,7 +80,7 @@ export default function App() {
   // Settings
   const [settings, setSettings] = useState<CeremonySettings>(() => {
     try {
-      const saved = localStorage.getItem('xma_settings_2026_v3');
+      const saved = localStorage.getItem('xma_settings_2026_v7');
       return saved ? JSON.parse(saved) : INITIAL_CEREMONY_SETTINGS;
     } catch {
       return INITIAL_CEREMONY_SETTINGS;
@@ -65,7 +90,7 @@ export default function App() {
   // Segments
   const [segments, setSegments] = useState<CeremonySegment[]>(() => {
     try {
-      const saved = localStorage.getItem('xma_segments_2026_v3');
+      const saved = localStorage.getItem('xma_segments_2026_v7');
       return saved ? JSON.parse(saved) : INITIAL_CEREMONY_SEGMENTS;
     } catch {
       return INITIAL_CEREMONY_SEGMENTS;
@@ -75,7 +100,7 @@ export default function App() {
   // Chat / Cheer Messages
   const [chatMessages, setChatMessages] = useState<LiveChatMessage[]>(() => {
     try {
-      const saved = localStorage.getItem('xma_chat_2026_v3');
+      const saved = localStorage.getItem('xma_chat_2026_v7');
       return saved ? JSON.parse(saved) : INITIAL_CHAT_MESSAGES;
     } catch {
       return INITIAL_CHAT_MESSAGES;
@@ -85,7 +110,7 @@ export default function App() {
   // Community Nominations
   const [communityNominations, setCommunityNominations] = useState<CommunityNomination[]>(() => {
     try {
-      const saved = localStorage.getItem('xma_community_nominations_2026_v3');
+      const saved = localStorage.getItem('xma_community_nominations_2026_v7');
       return saved ? JSON.parse(saved) : INITIAL_COMMUNITY_NOMINATIONS;
     } catch {
       return INITIAL_COMMUNITY_NOMINATIONS;
@@ -95,7 +120,7 @@ export default function App() {
   // PK XD User Account State (For 1-vote-per-category verified mode)
   const [userAccount, setUserAccount] = useState<PKXDUserAccount>(() => {
     try {
-      const saved = localStorage.getItem('xma_user_account_2026_v3');
+      const saved = localStorage.getItem('xma_user_account_2026_v7');
       return saved ? JSON.parse(saved) : {
         isLoggedIn: false,
         nickname: '',
@@ -117,7 +142,7 @@ export default function App() {
   // General vote history tracking
   const [userVotes, setUserVotes] = useState<Record<string, string>>(() => {
     try {
-      const saved = localStorage.getItem('xma_user_votes_2026_v3');
+      const saved = localStorage.getItem('xma_user_votes_2026_v7');
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -134,48 +159,53 @@ export default function App() {
   // Persistence Effects
   useEffect(() => {
     try {
-      localStorage.setItem('xma_categories_2026_v3', JSON.stringify(categories));
+      localStorage.setItem('xma_categories_2026_v7', JSON.stringify(categories));
     } catch {}
   }, [categories]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('xma_settings_2026_v3', JSON.stringify(settings));
+      localStorage.setItem('xma_settings_2026_v7', JSON.stringify(settings));
     } catch {}
   }, [settings]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('xma_chat_2026_v3', JSON.stringify(chatMessages));
+      localStorage.setItem('xma_chat_2026_v7', JSON.stringify(chatMessages));
     } catch {}
   }, [chatMessages]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('xma_community_nominations_2026_v3', JSON.stringify(communityNominations));
+      localStorage.setItem('xma_community_nominations_2026_v7', JSON.stringify(communityNominations));
     } catch {}
   }, [communityNominations]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('xma_user_account_2026_v3', JSON.stringify(userAccount));
+      localStorage.setItem('xma_user_account_2026_v7', JSON.stringify(userAccount));
     } catch {}
   }, [userAccount]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('xma_user_votes_2026_v3', JSON.stringify(userVotes));
+      localStorage.setItem('xma_user_votes_2026_v7', JSON.stringify(userVotes));
     } catch {}
   }, [userVotes]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('xma_countdown_active_v2', isCountdownActive ? 'true' : 'false');
+      localStorage.setItem('xma_countdown_active_v8', isCountdownActive ? 'true' : 'false');
     } catch {}
   }, [isCountdownActive]);
 
   // Mass Voting Handler (Unlimited votes for fan club mass campaigns - 25% weight)
   const handleMassVote = (categoryId: string, nomineeId: string, quantity: number) => {
+    const targetCat = categories.find((c) => c.id === categoryId);
+    if (!targetCat || targetCat.status !== 'voting_open') {
+      return; // Do not register votes while voting is closed / in nominee exhibition phase
+    }
+
     const updatedCategories = categories.map((cat) => {
       if (cat.id === categoryId) {
         return {
@@ -202,6 +232,11 @@ export default function App() {
 
   // Verified Single Vote Handler (1 vote per category with PK XD login - 75% weight)
   const handleVerifiedSingleVote = (categoryId: string, nomineeId: string) => {
+    const targetCat = categories.find((c) => c.id === categoryId);
+    if (!targetCat || targetCat.status !== 'voting_open') {
+      return; // Do not register votes while voting is closed / in nominee exhibition phase
+    }
+
     const prevNomineeId = userAccount.verifiedVotes[categoryId];
 
     const updatedCategories = categories.map((cat) => {
@@ -398,6 +433,7 @@ export default function App() {
             onVote={(catId, nomId) => handleMassVote(catId, nomId, 1)}
             onSelectNominee={(nominee, category) => setSelectedNomineeModal({ nominee, category })}
             onSwitchToCeremony={() => setActiveTab('voting')}
+            onSwitchToAdmin={() => setActiveTab('admin')}
           />
         )}
 
@@ -410,6 +446,7 @@ export default function App() {
             onVerifiedSingleVote={handleVerifiedSingleVote}
             onSelectNominee={(nominee, category) => setSelectedNomineeModal({ nominee, category })}
             onOpenLoginModal={() => setIsLoginModalOpen(true)}
+            onSwitchToAdmin={() => setActiveTab('admin')}
           />
         )}
 
@@ -421,6 +458,8 @@ export default function App() {
             onLikeNomination={handleLikeNomination}
             userNickname={userAccount.nickname}
             userPkxdTag={userAccount.pkxdTag}
+            isOpen={settings.communityNominationsOpen ?? false}
+            onNavigate={(tab) => setActiveTab(tab)}
           />
         )}
 

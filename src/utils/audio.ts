@@ -214,3 +214,80 @@ export function playAdminGavel() {
     // Graceful fallback
   }
 }
+
+export function playEpicEntranceSequence() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // 1. Deep Sub-bass Impact / Braam (0s -> 2.5s)
+    const subOsc = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    subOsc.type = 'triangle';
+    subOsc.frequency.setValueAtTime(110, now);
+    subOsc.frequency.exponentialRampToValueAtTime(38, now + 1.2);
+    subGain.gain.setValueAtTime(0.35, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+    subOsc.connect(subGain);
+    subGain.connect(ctx.destination);
+    subOsc.start(now);
+    subOsc.stop(now + 2.5);
+
+    // 2. Ascending Golden Sweeping Arpeggio (0.2s -> 2.0s)
+    const sweepNotes = [220, 277.18, 329.63, 440, 554.37, 659.25, 880, 1108.73, 1318.51, 1760];
+    sweepNotes.forEach((freq, idx) => {
+      const noteTime = now + 0.2 + idx * 0.12;
+      const noteOsc = ctx.createOscillator();
+      const noteGain = ctx.createGain();
+      noteOsc.type = 'sine';
+      noteOsc.frequency.setValueAtTime(freq, noteTime);
+      noteGain.gain.setValueAtTime(0.12, noteTime);
+      noteGain.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.35);
+      noteOsc.connect(noteGain);
+      noteGain.connect(ctx.destination);
+      noteOsc.start(noteTime);
+      noteOsc.stop(noteTime + 0.35);
+    });
+
+    // 3. Laser Beams & Shimmering Sparkles (1.4s -> 3.2s)
+    [0, 0.25, 0.5, 0.75].forEach((offset) => {
+      const beamTime = now + 1.4 + offset;
+      const beamOsc = ctx.createOscillator();
+      const beamGain = ctx.createGain();
+      beamOsc.type = 'sawtooth';
+      beamOsc.frequency.setValueAtTime(1800, beamTime);
+      beamOsc.frequency.exponentialRampToValueAtTime(300, beamTime + 0.22);
+      beamGain.gain.setValueAtTime(0.1, beamTime);
+      beamGain.gain.exponentialRampToValueAtTime(0.001, beamTime + 0.22);
+      beamOsc.connect(beamGain);
+      beamGain.connect(ctx.destination);
+      beamOsc.start(beamTime);
+      beamOsc.stop(beamTime + 0.22);
+    });
+
+    // 4. Grand Celebratory Fanfare Climax (2.2s -> 4.5s)
+    const climaxChords = [
+      { freqs: [440, 554.37, 659.25], time: now + 2.2, dur: 0.5 },     // A major
+      { freqs: [493.88, 622.25, 739.99], time: now + 2.7, dur: 0.5 },  // B major
+      { freqs: [554.37, 698.46, 830.61], time: now + 3.2, dur: 1.4 }   // C# major crescendo
+    ];
+
+    climaxChords.forEach((chord) => {
+      chord.freqs.forEach((freq) => {
+        const chordOsc = ctx.createOscillator();
+        const chordGain = ctx.createGain();
+        chordOsc.type = 'sine';
+        chordOsc.frequency.setValueAtTime(freq, chord.time);
+        chordGain.gain.setValueAtTime(0.16, chord.time);
+        chordGain.gain.exponentialRampToValueAtTime(0.001, chord.time + chord.dur);
+        chordOsc.connect(chordGain);
+        chordGain.connect(ctx.destination);
+        chordOsc.start(chord.time);
+        chordOsc.stop(chord.time + chord.dur);
+      });
+    });
+  } catch {
+    // Graceful fallback
+  }
+}

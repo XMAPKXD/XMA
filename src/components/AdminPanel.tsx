@@ -322,6 +322,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     onUpdateCategories(categories.filter((c) => c.id !== categoryId));
   };
 
+  // Set All Categories Status
+  const handleSetAllCategoriesStatus = (status: Category['status']) => {
+    const updated = categories.map((c) => ({ ...c, status }));
+    onUpdateCategories(updated);
+  };
+
+  // Zero out all votes across all nominees
+  const handleZeroAllVotes = () => {
+    if (!confirm('Tem certeza que deseja zerar todos os votos de todos os indicados?')) return;
+    const updated = categories.map((cat) => ({
+      ...cat,
+      nominees: cat.nominees.map((nom) => ({
+        ...nom,
+        votes: 0,
+        verifiedVotes: 0,
+        massVotes: 0
+      }))
+    }));
+    onUpdateCategories(updated);
+  };
+
   // Approve Community Nomination & turn into official nominee
   const handleApproveCommunityNomination = (nom: CommunityNomination) => {
     // 1. Create Nominee
@@ -340,7 +361,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       projectTitle: nom.workTitle || 'Trabalho Aprovado pela Comunidade',
       projectDescription: nom.reason || 'Indicado oficial sugerido pelos fãs.',
       projectType: 'media_creator',
-      votes: 2500,
+      votes: 0,
+      verifiedVotes: 0,
+      massVotes: 0,
       pkxdId: nom.nomineePkxdId || '#Admin000',
       bio: nom.reason,
       badge: 'Voz da Comunidade'
@@ -949,23 +972,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
               <div>
                 <h2 className="text-xl font-bold text-white font-cinzel">
-                  Gerenciamento de Categorias de Premiação
+                  Gerenciamento de Categorias & Urnas
                 </h2>
                 <p className="text-xs text-zinc-400">
-                  Crie novas categorias, edite títulos, subtítulos ou altere o status das urnas.
+                  Crie categorias, defina se as urnas estão abertas ou em modo "Apenas Apresentação dos Indicados", ou revele vencedores.
                 </p>
               </div>
 
-              <button
-                onClick={() => {
-                  setEditingCategoryId(null);
-                  setIsAddingCategory(!isAddingCategory);
-                }}
-                className="px-4 py-2 rounded-xl bg-gold-metallic-btn text-black font-bold text-xs uppercase flex items-center gap-2 cursor-pointer self-start sm:self-auto"
-              >
-                <Plus className="w-4 h-4" />
-                <span>{isAddingCategory ? 'Cancelar' : 'Nova Categoria'}</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSetAllCategoriesStatus('voting_closed')}
+                  className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-amber-500/30 text-[11px] font-bold cursor-pointer"
+                  title="Bloqueia votos em todas as categorias para apenas apresentar os indicados"
+                >
+                  🔒 Fechar Votos (Apenas Indicados)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetAllCategoriesStatus('voting_open')}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold cursor-pointer"
+                  title="Abre as urnas para o público votar"
+                >
+                  🔓 Abrir Votações Gerais
+                </button>
+                <button
+                  type="button"
+                  onClick={handleZeroAllVotes}
+                  className="px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/60 text-[11px] font-bold cursor-pointer"
+                  title="Zera a contagem de votos de todos os indicados"
+                >
+                  🔄 Zerar Votos
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingCategoryId(null);
+                    setIsAddingCategory(!isAddingCategory);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-gold-metallic-btn text-black font-bold text-xs uppercase flex items-center gap-2 cursor-pointer self-start sm:self-auto ml-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isAddingCategory ? 'Cancelar' : 'Nova Categoria'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Add/Edit Category Form */}
@@ -1033,6 +1082,46 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <span className="text-xs text-amber-400 font-semibold">{c.sponsor}</span>
                   </div>
                   <p className="text-xs text-zinc-400">{c.subtitle}</p>
+
+                  {/* Status Toggle Bar */}
+                  <div className="pt-2">
+                    <label className="block text-[11px] text-zinc-400 mb-1 font-semibold">Status da Urna:</label>
+                    <div className="grid grid-cols-3 gap-1.5 bg-black/60 p-1 rounded-xl border border-zinc-800">
+                      <button
+                        type="button"
+                        onClick={() => handleSetCategoryStatus(c.id, 'voting_closed')}
+                        className={`py-1 rounded-lg text-[10px] font-bold transition-all ${
+                          c.status === 'voting_closed' || !c.status
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        Apenas Indicados
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetCategoryStatus(c.id, 'voting_open')}
+                        className={`py-1 rounded-lg text-[10px] font-bold transition-all ${
+                          c.status === 'voting_open'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        Votação Aberta
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetCategoryStatus(c.id, 'winner_revealed')}
+                        className={`py-1 rounded-lg text-[10px] font-bold transition-all ${
+                          c.status === 'winner_revealed'
+                            ? 'bg-amber-400 text-black font-extrabold shadow-sm'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        Vencedor Revelado
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="flex items-center justify-between text-xs pt-3 border-t border-zinc-800">
                     <span className="text-zinc-400 font-medium">
@@ -1296,6 +1385,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <h2 className="text-xl font-bold text-white font-cinzel pb-3 border-b border-zinc-800">
               Segurança do Painel & Configurações da Gala
             </h2>
+
+            {/* Community Nominations Status Toggle */}
+            <div className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-bold text-amber-300 font-cinzel">Fase de Indicações da Comunidade</div>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  {settings.communityNominationsOpen
+                    ? 'As indicações públicas estão ABERTAS no momento.'
+                    : 'As indicações públicas estão ENCERRADAS. Apenas os indicados oficiais são exibidos na Galeria e Votação.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const newState = !settings.communityNominationsOpen;
+                  onUpdateSettings({ ...settings, communityNominationsOpen: newState });
+                  try {
+                    playAdminGavel();
+                  } catch {}
+                }}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                  settings.communityNominationsOpen
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
+                    : 'bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-red-500/30'
+                }`}
+              >
+                {settings.communityNominationsOpen ? '🟢 Abertas (Clique p/ Fechar)' : '🔴 Encerradas (Clique p/ Abrir)'}
+              </button>
+            </div>
 
             {/* Ticker Text */}
             <form onSubmit={handleUpdateTicker} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-3">

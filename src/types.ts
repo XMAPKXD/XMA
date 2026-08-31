@@ -123,5 +123,6 @@ export interface CeremonySettings {
   hostName: string;
   coHostName: string;
   soundEffectsEnabled: boolean;
+  communityNominationsOpen?: boolean;
 }
 

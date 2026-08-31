@@ -75,12 +75,13 @@ export const INITIAL_CEREMONY_SETTINGS: CeremonySettings = {
   stageSubtitle: 'A Maior Premiação da Cultura e Criação do Multiverso PK XD',
   viewerCount: 24890,
   activeSegmentId: 'seg-opening',
-  tickerText: '🏆 XMA 2026: Votações Abertas! Cadastre indicados pelo painel Admins XMA ou envie sua sugestão na aba da Comunidade! ⚡',
+  tickerText: '✨ XMA 2026: Conheça os Indicados Oficiais! As urnas de votação abrirão em breve pela comissão organizadora! 🏆',
   goldenEnvelopeOpened: false,
   revealedWinnerCategoryIds: [],
   hostName: 'Admins XMA',
   coHostName: 'Apresentação Oficial Gala',
-  soundEffectsEnabled: true
+  soundEffectsEnabled: true,
+  communityNominationsOpen: false
 };
 
 export const INITIAL_CEREMONY_SEGMENTS: CeremonySegment[] = [

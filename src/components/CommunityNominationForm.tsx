@@ -15,7 +15,10 @@ import {
   Video,
   Youtube,
   AlertCircle,
-  X
+  X,
+  Trophy,
+  Vote,
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { triggerGoldenConfetti } from '../utils/confetti';
@@ -28,13 +31,17 @@ interface CommunityNominationFormProps {
   onLikeNomination?: (nominationId: string) => void;
   userPkxdTag?: string;
   userNickname?: string;
+  isOpen?: boolean;
+  onNavigate?: (tab: 'gallery' | 'voting') => void;
 }
 
 export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = ({
   categories,
   onSubmitNomination,
   userPkxdTag = '',
-  userNickname = ''
+  userNickname = '',
+  isOpen = false,
+  onNavigate
 }) => {
   const [formData, setFormData] = useState({
     submittedByName: userNickname || '',
@@ -54,6 +61,7 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
   const [validationError, setValidationError] = useState<string | null>(null);
   const [submittedSuccess, setSubmittedSuccess] = useState<boolean>(false);
   const [lastSubmittedNominee, setLastSubmittedNominee] = useState<string>('');
+  const [showAdminOverrideForm, setShowAdminOverrideForm] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedCategoryObj = categories.find((c) => c.id === formData.categoryId);
@@ -184,31 +192,95 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
 
   return (
     <div className="space-y-10 pb-20 max-w-6xl mx-auto">
-      {/* Hero Header */}
-      <div className="relative rounded-3xl bg-gradient-to-r from-[#171822] via-[#2a2212] to-[#12131b] border-2 border-amber-500/50 p-6 sm:p-10 shadow-2xl overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
+      {/* If nominations are closed */}
+      {!isOpen && !showAdminOverrideForm ? (
+        <div className="space-y-8">
+          {/* Closed Hero Card */}
+          <div className="relative rounded-3xl bg-gradient-to-r from-[#171822] via-[#241a10] to-[#12131b] border-2 border-amber-500/50 p-6 sm:p-10 shadow-2xl overflow-hidden text-center space-y-6">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/60 flex items-center justify-center mx-auto text-amber-300 shadow-xl shadow-amber-500/20">
+              <Clock className="w-8 h-8 text-amber-400" />
+            </div>
 
-        <div className="relative z-10 space-y-4 max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-400/20 border border-amber-400/50 text-amber-300">
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Indicação Oficial da Comunidade PK XD</span>
-          </div>
+            <div className="space-y-3 max-w-2xl mx-auto">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-red-500/20 border border-red-400/40 text-red-300">
+                <span>Fase de Indicações Encerrada</span>
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-cinzel">
+                Indicações <span className="text-gold-metallic">Oficialmente Encerradas</span>
+              </h1>
+              <p className="text-zinc-300 text-sm sm:text-base leading-relaxed">
+                A fase de envio de sugestões e indicações públicas para o <strong>XMA 2026</strong> foi concluída com sucesso! A comissão organizadora dos <strong>Admins do XMA</strong> avaliou os inscritos e os indicados oficiais já estão em exibição na Galeria e nas Urnas de Votação.
+              </p>
+            </div>
 
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-cinzel">
-            Indique seu <span className="text-gold-metallic">Astro Favorito</span>
-          </h1>
+            {/* Quick Action Navigation Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto pt-2">
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate('gallery')}
+                className="p-5 rounded-2xl bg-zinc-900/90 border border-amber-500/40 hover:border-amber-400 hover:bg-zinc-800/90 transition-all text-left space-y-2 group cursor-pointer shadow-lg hover:scale-[1.02]"
+              >
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400 flex items-center justify-center text-amber-300 group-hover:scale-110 transition-transform">
+                  <Trophy className="w-5 h-5 text-amber-400" />
+                </div>
+                <div className="font-bold text-white font-cinzel text-base">Ver Indicados Oficiais</div>
+                <p className="text-xs text-zinc-400">Explore todos os astros e categorias em disputa pelo troféu.</p>
+              </button>
 
-          <p className="text-zinc-300 text-sm sm:text-base leading-relaxed">
-            Conhece um criador de conteúdo lendário, um beatmaker genial ou aquele jogador que cria os melhores clipes e looks?
-            Envie sua indicação oficial diretamente para a comissão organizadora avaliar!
-          </p>
+              <button
+                type="button"
+                onClick={() => onNavigate && onNavigate('voting')}
+                className="p-5 rounded-2xl bg-gold-metallic-btn text-black transition-all text-left space-y-2 group cursor-pointer shadow-lg hover:scale-[1.02]"
+              >
+                <div className="w-10 h-10 rounded-xl bg-black/20 border border-black/30 flex items-center justify-center text-black group-hover:scale-110 transition-transform">
+                  <Vote className="w-5 h-5 text-black" />
+                </div>
+                <div className="font-black text-black font-cinzel text-base">Votar no seu Criador</div>
+                <p className="text-xs text-black/80 font-medium">Participe da votação em massa e do voto único verificado.</p>
+              </button>
+            </div>
 
-          <div className="pt-2 flex items-center gap-2 text-xs text-amber-300/90 font-medium">
-            <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>As indicações são confidenciais e enviadas exclusivamente aos <strong>Administradores do XMA</strong>.</span>
+            {/* Admin toggle override */}
+            <div className="pt-4 border-t border-zinc-800 text-xs text-zinc-500 flex items-center justify-center gap-2">
+              <Lock className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Painel Organizador:</span>
+              <button
+                type="button"
+                onClick={() => setShowAdminOverrideForm(true)}
+                className="text-amber-400 hover:text-amber-300 underline font-semibold cursor-pointer"
+              >
+                Abrir formulário de cadastro de exceção (Admins)
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* Hero Header */}
+          <div className="relative rounded-3xl bg-gradient-to-r from-[#171822] via-[#2a2212] to-[#12131b] border-2 border-amber-500/50 p-6 sm:p-10 shadow-2xl overflow-hidden">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 space-y-4 max-w-3xl">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-400/20 border border-amber-400/50 text-amber-300">
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Indicação Oficial da Comunidade PK XD</span>
+              </div>
+
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight font-cinzel">
+                Indique seu <span className="text-gold-metallic">Astro Favorito</span>
+              </h1>
+
+              <p className="text-zinc-300 text-sm sm:text-base leading-relaxed">
+                Conhece um criador de conteúdo lendário, um beatmaker genial ou aquele jogador que cria os melhores clipes e looks?
+                Envie sua indicação oficial diretamente para a comissão organizadora avaliar!
+              </p>
+
+              <div className="pt-2 flex items-center gap-2 text-xs text-amber-300/90 font-medium">
+                <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>As indicações são confidenciais e enviadas exclusivamente aos <strong>Administradores do XMA</strong>.</span>
+              </div>
+            </div>
+          </div>
 
       {/* Success Alert Banner */}
       <AnimatePresence>
@@ -647,6 +719,8 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

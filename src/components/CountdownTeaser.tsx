@@ -32,10 +32,23 @@ import {
   Lock,
   Image as ImageIcon,
   AlertCircle,
-  X
+  X,
+  Search,
+  ExternalLink,
+  Eye,
+  Info,
+  Calendar
 } from 'lucide-react';
-import { Category, CommunityNomination, isAuthorizedAdminEmail } from '../types';
-import { playClockTick, playGrandReveal, playSlideWhoosh, playVoteChime, playFanfare, playAdminGavel } from '../utils/audio';
+import { Category, Nominee, CommunityNomination, isAuthorizedAdminEmail } from '../types';
+import { 
+  playClockTick, 
+  playGrandReveal, 
+  playSlideWhoosh, 
+  playVoteChime, 
+  playFanfare, 
+  playAdminGavel,
+  playEpicEntranceSequence 
+} from '../utils/audio';
 import { triggerGoldenConfetti } from '../utils/confetti';
 import { signInWithGoogle } from '../lib/firebase';
 
@@ -72,11 +85,11 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
   userPkxdTag = '',
   onAdminUnlock
 }) => {
-  // Target timestamp: 15 de Setembro de 2026 às 19:00
+  // Target timestamp: 15 de Setembro de 2026 às 19:00 (Horário Oficial de Brasília / GMT-3)
   const targetTimestamp = useMemo(() => {
     if (targetDate) return targetDate.getTime();
-    // 15 de Setembro de 2026 às 19:00 (Mês 8 = Setembro no JS Date)
-    return new Date(2026, 8, 15, 19, 0, 0, 0).getTime();
+    // 15 de Setembro de 2026 às 19:00:00 (Mês 8 = Setembro no JS Date)
+    return new Date(2026, 8, 15, 19, 0, 0).getTime();
   }, [targetDate]);
 
   const [timeLeft, setTimeLeft] = useState<{
@@ -88,13 +101,35 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
   }>({ days: 0, hours: 0, minutes: 0, seconds: 0, total: 1000 });
 
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  // View mode: 'teaser' (locked countdown) vs 'revealed_presentation' (explaining XMA after countdown ends)
+  // View mode: 'teaser' (locked countdown) vs 'revealing' (epic animation) vs 'presentation' (explaining XMA after countdown ends)
   const [viewMode, setViewMode] = useState<'teaser' | 'revealing' | 'presentation'>('teaser');
+  const [revealStage, setRevealStage] = useState<number>(1);
   const [hasInteracted, setHasInteracted] = useState<boolean>(false);
   const [currentSlide, setCurrentSlide] = useState<number>(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState<boolean>(true);
 
-  // Nomination form state in countdown screen
+  // Admin session check
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('xma_admin_session_unlocked') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Main active tab in Countdown Teaser: 'nominees' (Indicados até o momento) | 'about' | 'nominate'
+  const [activeTeaserTab, setActiveTeaserTab] = useState<'nominees' | 'about' | 'nominate'>('nominees');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+  const [searchNomineeTerm, setSearchNomineeTerm] = useState<string>('');
+
+  // Selected nominee for detail preview modal
+  const [selectedNomineePreview, setSelectedNomineePreview] = useState<{
+    nominee: Nominee;
+    category: Category;
+  } | null>(null);
+
+  // Nomination form state in countdown screen (for admin override / closed view)
+  const [showAdminNominationForm, setShowAdminNominationForm] = useState<boolean>(false);
   const [nominationTab, setNominationTab] = useState<'creator' | 'category'>('creator');
   const [nomineeName, setNomineeName] = useState('');
   const [nomineePkxdId, setNomineePkxdId] = useState('');
@@ -222,6 +257,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
       if (isAuthorizedAdminEmail(googleUser.email)) {
         try {
           sessionStorage.setItem('xma_admin_session_unlocked', 'true');
+          setIsAdminUnlocked(true);
           playFanfare();
           playAdminGavel();
           triggerGoldenConfetti();
@@ -236,7 +272,6 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
           });
         }
         setIsAdminModalOpen(false);
-        onReveal();
       } else {
         setAdminError(`Acesso negado. O e-mail (${googleUser.email}) não é um Administrador autorizado.`);
       }
@@ -246,6 +281,13 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
     } finally {
       setIsGoogleLoading(false);
     }
+  };
+
+  const handleAdminLogout = () => {
+    try {
+      sessionStorage.removeItem('xma_admin_session_unlocked');
+      setIsAdminUnlocked(false);
+    } catch {}
   };
 
   const tickToggleRef = useRef<boolean>(false);
@@ -476,16 +518,30 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
   }, []);
 
   const triggerRevealSequence = () => {
-    if (viewMode !== 'teaser') return;
     setViewMode('revealing');
-    playGrandReveal();
+    setRevealStage(1);
+    
+    // Play the multi-layered epic entrance sequence audio
+    playEpicEntranceSequence();
     triggerGoldenConfetti();
 
-    // After grand fanfare, transition to the presentation showcase
+    // Stage 1 -> Stage 2 (Golden Shockwaves & Gates Opening)
+    setTimeout(() => {
+      setRevealStage(2);
+      triggerGoldenConfetti();
+    }, 2800);
+
+    // Stage 2 -> Stage 3 (Ascending Trophy & Welcome Text)
+    setTimeout(() => {
+      setRevealStage(3);
+      triggerGoldenConfetti();
+    }, 5500);
+
+    // Stage 3 -> Transition to presentation slides or direct access
     setTimeout(() => {
       setViewMode('presentation');
       triggerGoldenConfetti();
-    }, 2400);
+    }, 8500);
   };
 
   // Tick calculation & Clock Sound (Active during teaser mode)
@@ -556,71 +612,141 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-500/10 rounded-full blur-[160px] pointer-events-none z-0 animate-pulse" />
 
       {/* Top Bar: Controls & Sound Toggle */}
-      <header className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-6 flex items-center justify-between z-20 relative">
-        <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-          <span className="text-[11px] tracking-[0.25em] uppercase font-mono text-amber-300/90 font-bold drop-shadow-sm">
-            {viewMode === 'teaser' ? 'CONTAGEM REGRESSIVA OFICIAL' : 'REVELAÇÃO OFICIAL XMA'}
-          </span>
+      <header className="w-full max-w-6xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6 flex flex-col gap-3 z-20 relative">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+            <span className="text-[10px] sm:text-[11px] tracking-[0.2em] uppercase font-mono text-amber-300/90 font-bold drop-shadow-sm truncate">
+              {viewMode === 'teaser' ? 'CONTAGEM REGRESSIVA OFICIAL' : viewMode === 'revealing' ? 'ABERTURA ÉPICA EM ANDAMENTO' : 'REVELAÇÃO OFICIAL XMA'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Sound Toggle */}
+            {viewMode === 'teaser' && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setHasInteracted(true);
+                  setIsMuted(!isMuted);
+                  if (isMuted) playClockTick(false);
+                }}
+                className="px-2.5 sm:px-3 py-1.5 rounded-full bg-zinc-900/90 hover:bg-zinc-800 text-amber-300 border border-amber-400/30 text-xs font-semibold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer shadow-lg backdrop-blur-md hover:scale-105 active:scale-95"
+                title={isMuted ? 'Ativar som Tic-Tac' : 'Silenciar Tic-Tac'}
+              >
+                {isMuted ? (
+                  <>
+                    <VolumeX className="w-3.5 h-3.5 text-zinc-400" />
+                    <span className="text-[11px] hidden sm:inline">Tic-Tac Mudo</span>
+                  </>
+                ) : (
+                  <>
+                    <Volume2 className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                    <span className="text-[11px] hidden sm:inline">Tic-Tac Ativo</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Admin Access / Status Button */}
+            {!isAdminUnlocked ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsAdminModalOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-amber-500/20 hover:from-amber-500/40 hover:to-amber-400/40 text-amber-200 border border-amber-400/50 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-lg backdrop-blur-md hover:scale-105 active:scale-95"
+                title="Acesso exclusivo para administradores e organizadores"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                <span>Acesso Admin 🔐</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <span className="px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/60 text-amber-300 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-amber-400" />
+                  <span className="hidden sm:inline">Admin Autenticado</span>
+                  <span className="sm:hidden">Admin</span>
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAdminLogout();
+                  }}
+                  className="px-2.5 py-1 rounded-full bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-red-300 text-[10px] font-semibold transition-all cursor-pointer"
+                  title="Sair da sessão de Admin"
+                >
+                  Sair
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5 sm:gap-3">
-          {/* Sound Toggle */}
-          {viewMode === 'teaser' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setHasInteracted(true);
-                setIsMuted(!isMuted);
-                if (isMuted) playClockTick(false);
-              }}
-              className="px-3 py-1.5 rounded-full bg-zinc-900/90 hover:bg-zinc-800 text-amber-300 border border-amber-400/30 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-lg backdrop-blur-md hover:scale-105 active:scale-95"
-              title={isMuted ? 'Ativar som Tic-Tac' : 'Silenciar Tic-Tac'}
-            >
-              {isMuted ? (
-                <>
-                  <VolumeX className="w-3.5 h-3.5 text-zinc-400" />
-                  <span className="text-[11px] hidden sm:inline">Tic-Tac Mudo</span>
-                </>
-              ) : (
-                <>
-                  <Volume2 className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                  <span className="text-[11px] hidden sm:inline">Tic-Tac Ativo</span>
-                </>
-              )}
-            </button>
-          )}
-
-          {/* Admin Access Button (Locked for Admins only before countdown ends) */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsAdminModalOpen(true);
-            }}
-            className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-amber-500/20 hover:from-amber-500/40 hover:to-amber-400/40 text-amber-200 border border-amber-400/50 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-lg backdrop-blur-md hover:scale-105 active:scale-95"
-            title="Acesso exclusivo para administradores e organizadores"
+        {/* Exclusive Admin Quick Simulation Bar (Only visible after authenticating as Admin) */}
+        {isAdminUnlocked && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full p-2.5 sm:p-3 rounded-2xl bg-gradient-to-r from-amber-950/80 via-[#18150f] to-amber-950/80 border-2 border-amber-500/60 shadow-xl shadow-amber-950/40 flex flex-col sm:flex-row items-center justify-between gap-2.5"
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
-            <span>Acesso Admin 🔐</span>
-          </button>
-        </div>
+            <div className="flex items-center gap-2 text-left w-full sm:w-auto">
+              <div className="w-7 h-7 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
+                <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-black text-amber-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>👑 Painel de Simulação do Organizador (Admin)</span>
+                </div>
+                <div className="text-[10px] text-zinc-400 truncate">
+                  Você está logado com privilégios de Administrador Oficial do XMA 2026.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerRevealSequence();
+                }}
+                className="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-black text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/30 hover:scale-105 active:scale-95 cursor-pointer"
+                title="Executar simulação da animação épica de entrada"
+              >
+                <Play className="w-3.5 h-3.5 text-black fill-black" />
+                <span>Simular Animação de Entrada 🎬</span>
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReveal();
+                }}
+                className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-amber-400/50 text-amber-300 hover:text-amber-200 text-xs font-bold transition-all shadow-sm cursor-pointer"
+                title="Ir diretamente para a arena oficial sem contagem"
+              >
+                Entrar no Site 🔓
+              </button>
+            </div>
+          </motion.div>
+        )}
       </header>
 
       {/* ========================================================================= */}
       {/* 1. MODO CONTAGEM REGRESSIVA (NÃO REVELA NADA, APENAS XMA, CHUVA DOURADA E TIC-TAC) */}
       {/* ========================================================================= */}
       {viewMode === 'teaser' && (
-        <main className="my-auto text-center z-20 flex flex-col items-center px-4 max-w-4xl py-8">
+        <main className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-6 sm:py-10 z-20 flex flex-col items-center text-center flex-1 min-w-0">
           {/* Glowing Trophy Badge */}
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 1.2, ease: 'easeOut' }}
-            className="mb-4"
+            className="mb-3 sm:mb-4"
           >
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-tr from-amber-400 via-amber-200 to-amber-600 p-[1.5px] mx-auto shadow-2xl shadow-amber-500/40">
-              <div className="w-full h-full bg-[#07070b] rounded-[22px] flex items-center justify-center">
-                <Trophy className="w-8 h-8 sm:w-10 sm:h-10 text-amber-400" />
+            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-amber-400 via-amber-200 to-amber-600 p-[1.5px] mx-auto shadow-2xl shadow-amber-500/40">
+              <div className="w-full h-full bg-[#07070b] rounded-[14px] sm:rounded-[22px] flex items-center justify-center">
+                <Trophy className="w-7 h-7 sm:w-10 sm:h-10 text-amber-400" />
               </div>
             </div>
           </motion.div>
@@ -632,7 +758,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
             transition={{ duration: 1.4, delay: 0.2 }}
             className="relative"
           >
-            <h1 className="text-8xl sm:text-9xl md:text-[13rem] font-black font-cinzel tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-[#FFF5C0] via-[#E6B800] to-[#8C6D00] drop-shadow-[0_15px_35px_rgba(230,184,0,0.4)] leading-none select-none">
+            <h1 className="text-7xl sm:text-9xl md:text-[12rem] font-black font-cinzel tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-[#FFF5C0] via-[#E6B800] to-[#8C6D00] drop-shadow-[0_15px_35px_rgba(230,184,0,0.4)] leading-none select-none">
               XMA
             </h1>
             <div className="absolute -inset-8 bg-amber-400/10 blur-3xl -z-10 rounded-full" />
@@ -643,13 +769,13 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1, delay: 0.5 }}
-            className="space-y-1.5 mt-2 mb-10"
+            className="space-y-1.5 mt-2 mb-6 sm:mb-10 px-2"
           >
-            <p className="text-xs sm:text-base font-semibold uppercase tracking-[0.4em] text-amber-300/90 font-mono">
+            <p className="text-[11px] sm:text-base font-semibold uppercase tracking-[0.25em] sm:tracking-[0.4em] text-amber-300/90 font-mono">
               PK XD Music & Media Awards 2026
             </p>
-            <p className="text-xs sm:text-sm text-zinc-400 font-medium">
-              Grande Estreia Mundial: <strong className="text-amber-300">15 de Setembro às 19:00 (Horário Oficial)</strong>
+            <p className="text-[11px] sm:text-sm text-zinc-400 font-medium">
+              Grande Estreia Mundial: <strong className="text-amber-300">15 de Setembro às 19:00 (Horário Oficial de Brasília)</strong>
             </p>
           </motion.div>
 
@@ -658,53 +784,53 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.7 }}
-            className="grid grid-cols-4 gap-3 sm:gap-6 w-full max-w-xl"
+            className="grid grid-cols-4 gap-2 sm:gap-4 md:gap-6 w-full max-w-xl px-1"
           >
             {/* Days */}
             <div className="flex flex-col items-center">
-              <div className="w-full py-4 sm:py-6 rounded-2xl bg-zinc-950/85 border-2 border-amber-500/40 backdrop-blur-xl shadow-xl shadow-amber-500/10 flex items-center justify-center">
-                <span className="text-3xl sm:text-5xl md:text-6xl font-black font-cinzel text-white drop-shadow-[0_2px_10px_rgba(245,158,11,0.5)]">
+              <div className="w-full py-3 sm:py-5 md:py-6 rounded-xl sm:rounded-2xl bg-zinc-950/85 border sm:border-2 border-amber-500/40 backdrop-blur-xl shadow-xl shadow-amber-500/10 flex items-center justify-center">
+                <span className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-cinzel text-white drop-shadow-[0_2px_10px_rgba(245,158,11,0.5)]">
                   {formatUnit(timeLeft.days)}
                 </span>
               </div>
-              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-400/90 mt-2">
+              <span className="text-[9px] sm:text-xs font-bold uppercase tracking-widest text-amber-400/90 mt-1.5 sm:mt-2">
                 Dias
               </span>
             </div>
 
             {/* Hours */}
             <div className="flex flex-col items-center">
-              <div className="w-full py-4 sm:py-6 rounded-2xl bg-zinc-950/85 border-2 border-amber-500/40 backdrop-blur-xl shadow-xl shadow-amber-500/10 flex items-center justify-center">
-                <span className="text-3xl sm:text-5xl md:text-6xl font-black font-cinzel text-white drop-shadow-[0_2px_10px_rgba(245,158,11,0.5)]">
+              <div className="w-full py-3 sm:py-5 md:py-6 rounded-xl sm:rounded-2xl bg-zinc-950/85 border sm:border-2 border-amber-500/40 backdrop-blur-xl shadow-xl shadow-amber-500/10 flex items-center justify-center">
+                <span className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-cinzel text-white drop-shadow-[0_2px_10px_rgba(245,158,11,0.5)]">
                   {formatUnit(timeLeft.hours)}
                 </span>
               </div>
-              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-400/90 mt-2">
+              <span className="text-[9px] sm:text-xs font-bold uppercase tracking-widest text-amber-400/90 mt-1.5 sm:mt-2">
                 Horas
               </span>
             </div>
 
             {/* Minutes */}
             <div className="flex flex-col items-center">
-              <div className="w-full py-4 sm:py-6 rounded-2xl bg-zinc-950/85 border-2 border-amber-500/40 backdrop-blur-xl shadow-xl shadow-amber-500/10 flex items-center justify-center">
-                <span className="text-3xl sm:text-5xl md:text-6xl font-black font-cinzel text-white drop-shadow-[0_2px_10px_rgba(245,158,11,0.5)]">
+              <div className="w-full py-3 sm:py-5 md:py-6 rounded-xl sm:rounded-2xl bg-zinc-950/85 border sm:border-2 border-amber-500/40 backdrop-blur-xl shadow-xl shadow-amber-500/10 flex items-center justify-center">
+                <span className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-cinzel text-white drop-shadow-[0_2px_10px_rgba(245,158,11,0.5)]">
                   {formatUnit(timeLeft.minutes)}
                 </span>
               </div>
-              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-400/90 mt-2">
+              <span className="text-[9px] sm:text-xs font-bold uppercase tracking-widest text-amber-400/90 mt-1.5 sm:mt-2">
                 Minutos
               </span>
             </div>
 
             {/* Seconds (Pulsing with Tic-Tac sound) */}
             <div className="flex flex-col items-center">
-              <div className="w-full py-4 sm:py-6 rounded-2xl bg-zinc-950/90 border-2 border-amber-400 backdrop-blur-xl shadow-xl shadow-amber-500/30 flex items-center justify-center relative overflow-hidden">
-                <span className="text-3xl sm:text-5xl md:text-6xl font-black font-cinzel text-amber-300 drop-shadow-[0_0_15px_rgba(245,158,11,0.8)] animate-pulse">
+              <div className="w-full py-3 sm:py-5 md:py-6 rounded-xl sm:rounded-2xl bg-zinc-950/90 border sm:border-2 border-amber-400 backdrop-blur-xl shadow-xl shadow-amber-500/30 flex items-center justify-center relative overflow-hidden">
+                <span className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black font-cinzel text-amber-300 drop-shadow-[0_0_15px_rgba(245,158,11,0.8)] animate-pulse">
                   {formatUnit(timeLeft.seconds)}
                 </span>
                 <div className="absolute bottom-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent" />
               </div>
-              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-300 mt-2">
+              <span className="text-[9px] sm:text-xs font-bold uppercase tracking-widest text-amber-300 mt-1.5 sm:mt-2">
                 Segundos
               </span>
             </div>
@@ -718,354 +844,481 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
           )}
 
           {/* ========================================================================= */}
-          {/* SEÇÃO DE INDICAÇÃO DE CRIADOR & CATEGORIA NA TELA DE CONTAGEM */}
+          {/* ABAS INTERATIVAS NA TELA DE CONTAGEM REGRESSIVA */}
           {/* ========================================================================= */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.9 }}
-            className="w-full max-w-2xl mt-8 mb-12 relative rounded-3xl bg-gradient-to-b from-[#151624] via-[#10111a] to-[#0a0b12] border-2 border-amber-500/50 p-6 sm:p-8 backdrop-blur-2xl shadow-2xl shadow-amber-950/40 text-left overflow-hidden"
+            className="w-full max-w-5xl mt-8 mb-12 relative z-20 text-left"
           >
-            {/* Ambient gold glow */}
-            <div className="absolute -top-16 -right-16 w-60 h-60 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+            {/* Main Tabs Selector */}
+            <div className="flex items-center justify-center p-1.5 bg-zinc-950/90 rounded-2xl sm:rounded-full border-2 border-amber-500/40 backdrop-blur-2xl shadow-xl shadow-amber-950/30 mb-6 max-w-2xl mx-auto flex-wrap sm:flex-nowrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setActiveTeaserTab('nominees')}
+                className={`flex-1 py-2.5 px-4 rounded-xl sm:rounded-full text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  activeTeaserTab === 'nominees'
+                    ? 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-black shadow-lg shadow-amber-500/25 scale-[1.02]'
+                    : 'text-zinc-400 hover:text-amber-200 hover:bg-zinc-900/60'
+                }`}
+              >
+                <Trophy className="w-4 h-4" />
+                <span>Indicados Revelados</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                  activeTeaserTab === 'nominees' ? 'bg-black/20 text-black' : 'bg-amber-500/20 text-amber-300'
+                }`}>
+                  {categories.reduce((acc, c) => acc + (c.nominees?.length || 0), 0)}
+                </span>
+              </button>
 
-            {/* Header */}
-            <div className="relative z-10 space-y-2 border-b border-zinc-800/80 pb-5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-amber-400/15 border border-amber-400/40 text-amber-300">
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Indicações Abertas da Comunidade • XMA 2026</span>
+              <button
+                type="button"
+                onClick={() => setActiveTeaserTab('about')}
+                className={`flex-1 py-2.5 px-4 rounded-xl sm:rounded-full text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  activeTeaserTab === 'about'
+                    ? 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-black shadow-lg shadow-amber-500/25 scale-[1.02]'
+                    : 'text-zinc-400 hover:text-amber-200 hover:bg-zinc-900/60'
+                }`}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Sobre o XMA 2026</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTeaserTab('nominate')}
+                className={`flex-1 py-2.5 px-4 rounded-xl sm:rounded-full text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  activeTeaserTab === 'nominate'
+                    ? 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-black shadow-lg shadow-amber-500/25 scale-[1.02]'
+                    : 'text-zinc-400 hover:text-amber-200 hover:bg-zinc-900/60'
+                }`}
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Sugerir Indicado</span>
+              </button>
+            </div>
+
+            {/* TAB 1: INDICADOS OFICIAIS REVELADOS ATÉ O MOMENTO */}
+            {activeTeaserTab === 'nominees' && (
+              <div className="space-y-6">
+                {/* Showcase Header Banner */}
+                <div className="p-6 rounded-3xl bg-gradient-to-b from-[#171824] via-[#10111a] to-[#0a0b12] border-2 border-amber-500/40 backdrop-blur-2xl shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10 border-b border-zinc-800/80 pb-5">
+                    <div>
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-amber-400/15 border border-amber-400/40 text-amber-300 mb-2">
+                        <Star className="w-3.5 h-3.5" />
+                        <span>Galeria Oficial de Concorrentes ao Troféu XMA</span>
+                      </div>
+                      <h3 className="text-2xl sm:text-3xl font-black font-cinzel text-white">
+                        Indicados Revelados <span className="text-amber-400">Até o Momento</span>
+                      </h3>
+                      <p className="text-xs sm:text-sm text-zinc-300 mt-1 max-w-xl">
+                        Conheça os criadores, músicas, vídeos e personalidades já confirmados para a disputa. As urnas abrirão oficialmente na grande estreia!
+                      </p>
+                    </div>
+
+                    {/* Search Input */}
+                    <div className="relative w-full sm:w-72 shrink-0">
+                      <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={searchNomineeTerm}
+                        onChange={(e) => setSearchNomineeTerm(e.target.value)}
+                        placeholder="Buscar por criador ou #tag..."
+                        className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 text-white text-xs placeholder:text-zinc-500 outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Category Filter Pills */}
+                  <div className="pt-4 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar relative z-10">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategoryFilter('all')}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                        selectedCategoryFilter === 'all'
+                          ? 'bg-amber-400 text-black shadow-md font-extrabold'
+                          : 'bg-zinc-900/90 text-zinc-400 hover:text-white border border-zinc-800'
+                      }`}
+                    >
+                      <span>Todas as Categorias</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/20 text-current">
+                        {categories.reduce((acc, c) => acc + (c.nominees?.length || 0), 0)}
+                      </span>
+                    </button>
+
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSelectedCategoryFilter(cat.id)}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                          selectedCategoryFilter === cat.id
+                            ? 'bg-amber-400 text-black shadow-md font-extrabold'
+                            : 'bg-zinc-900/90 text-zinc-400 hover:text-white border border-zinc-800'
+                        }`}
+                      >
+                        <span>{cat.title}</span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/20 text-current">
+                          {cat.nominees?.length || 0}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Nominees Grid */}
+                {(() => {
+                  const filteredCats = categories.filter(
+                    (cat) => selectedCategoryFilter === 'all' || cat.id === selectedCategoryFilter
+                  );
+
+                  let totalShown = 0;
+
+                  return (
+                    <div className="space-y-8">
+                      {filteredCats.map((cat) => {
+                        const matchingNominees = cat.nominees.filter((nom) => {
+                          if (!searchNomineeTerm.trim()) return true;
+                          const term = searchNomineeTerm.toLowerCase();
+                          return (
+                            nom.name.toLowerCase().includes(term) ||
+                            nom.handle.toLowerCase().includes(term) ||
+                            nom.pkxdId.toLowerCase().includes(term) ||
+                            nom.projectTitle.toLowerCase().includes(term)
+                          );
+                        });
+
+                        if (matchingNominees.length === 0) return null;
+                        totalShown += matchingNominees.length;
+
+                        return (
+                          <div key={cat.id} className="space-y-3">
+                            {/* Category Section Title */}
+                            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
+                                  <Trophy className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <h4 className="text-lg font-black font-cinzel text-white">
+                                    {cat.title}
+                                  </h4>
+                                  <p className="text-[11px] text-zinc-400">{cat.subtitle}</p>
+                                </div>
+                              </div>
+                              <span className="text-xs font-bold text-amber-400/90 font-mono">
+                                {matchingNominees.length} {matchingNominees.length === 1 ? 'indicado' : 'indicados'}
+                              </span>
+                            </div>
+
+                            {/* Nominees Cards Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {matchingNominees.map((nominee) => (
+                                <motion.div
+                                  key={nominee.id}
+                                  whileHover={{ y: -4 }}
+                                  className="rounded-2xl bg-gradient-to-b from-[#141522] via-[#0f1018] to-[#0a0a10] border border-amber-500/30 hover:border-amber-400 p-4.5 flex flex-col justify-between space-y-4 shadow-xl transition-all relative overflow-hidden group"
+                                >
+                                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/15 transition-all pointer-events-none" />
+
+                                  <div className="space-y-3 relative z-10">
+                                    {/* Header with Avatar & Tags */}
+                                    <div className="flex items-start gap-3.5">
+                                      <div className="relative shrink-0">
+                                        <div className="w-16 h-16 rounded-2xl p-[1.5px] bg-gradient-to-tr from-amber-400 via-amber-200 to-amber-600 shadow-lg shadow-amber-500/20">
+                                          <img
+                                            src={nominee.avatarUrl}
+                                            alt={nominee.name}
+                                            className="w-full h-full object-cover rounded-[14px] bg-zinc-900"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-700 text-zinc-300">
+                                            {nominee.pkxdId}
+                                          </span>
+                                          {nominee.badge && (
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-400/40 text-amber-300 truncate">
+                                              {nominee.badge}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <h5 className="text-base font-extrabold text-white truncate mt-1">
+                                          {nominee.name}
+                                        </h5>
+                                        <p className="text-xs text-amber-400/90 font-medium truncate">
+                                          {nominee.handle}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    {/* Project / Work Nominated */}
+                                    <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800/80 space-y-1">
+                                      <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                                        <Award className="w-3 h-3 text-amber-400" />
+                                        <span>Obra / Motivo da Indicação</span>
+                                      </div>
+                                      <div className="text-xs font-bold text-zinc-200 line-clamp-1">
+                                        {nominee.projectTitle}
+                                      </div>
+                                      <p className="text-[11px] text-zinc-400 line-clamp-2 leading-tight">
+                                        {nominee.projectDescription || nominee.bio}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* Footer Action */}
+                                  <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between gap-2 relative z-10">
+                                    <span className="text-[10px] font-bold text-amber-400/80 flex items-center gap-1">
+                                      <Sparkles className="w-3 h-3 text-amber-400" />
+                                      Indicado Oficial
+                                    </span>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedNomineePreview({ nominee, category: cat })}
+                                      className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-amber-300 hover:text-amber-200 border border-amber-500/40 hover:border-amber-400 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                                    >
+                                      <Eye className="w-3.5 h-3.5 text-amber-400" />
+                                      <span>Ver Perfil & Obra</span>
+                                    </button>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {totalShown === 0 && (
+                        <div className="p-12 text-center rounded-3xl bg-zinc-950/80 border border-zinc-800 text-zinc-400">
+                          <p className="text-sm">Nenhum indicado encontrado para os filtros selecionados.</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
-              <h3 className="text-xl sm:text-2xl font-black font-cinzel text-white flex items-center gap-2">
-                <span>Indicar Alguém & Categoria</span>
-                <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
-              </h3>
-              <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed">
-                Ajude a comissão organizadora a selecionar os indicados oficiais antes da revelação mundial em <strong className="text-amber-300">15 de Setembro às 19:00</strong>!
-              </p>
-            </div>
+            )}
 
-            {/* Tabs */}
-            <div className="grid grid-cols-2 gap-2 mt-5 p-1 bg-zinc-950/80 rounded-2xl border border-zinc-800 relative z-10">
-              <button
-                type="button"
-                onClick={() => setNominationTab('creator')}
-                className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                  nominationTab === 'creator'
-                    ? 'bg-gradient-to-r from-amber-500/30 via-amber-400/20 to-amber-500/30 text-amber-300 border border-amber-400/50 shadow-md'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <Star className="w-3.5 h-3.5" />
-                <span>Indicar Criador / Astro</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setNominationTab('category')}
-                className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                  nominationTab === 'category'
-                    ? 'bg-gradient-to-r from-amber-500/30 via-amber-400/20 to-amber-500/30 text-amber-300 border border-amber-400/50 shadow-md'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <Lightbulb className="w-3.5 h-3.5" />
-                <span>Sugerir Nova Categoria</span>
-              </button>
-            </div>
+            {/* TAB 2: SOBRE O XMA 2026 (APRESENTAÇÃO INTERATIVA) */}
+            {activeTeaserTab === 'about' && (
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="p-6 rounded-3xl bg-gradient-to-b from-[#171824] via-[#10111a] to-[#0a0b12] border-2 border-amber-500/40 backdrop-blur-2xl shadow-2xl relative overflow-hidden">
+                  <div className="text-center max-w-xl mx-auto space-y-2">
+                    <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 text-xs font-extrabold uppercase tracking-widest">
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <span>Guia Oficial da Premiação</span>
+                    </div>
+                    <h3 className="text-2xl sm:text-3xl font-black font-cinzel text-white">
+                      Como Funcionará o <span className="text-amber-400">XMA 2026</span>
+                    </h3>
+                    <p className="text-xs sm:text-sm text-zinc-300">
+                      Entenda as etapas da premiação, o sistema de votação e como será a noite da grande cerimônia de gala!
+                    </p>
+                  </div>
+                </div>
 
-            {/* Validation Alert */}
-            {nominationValidationError && (
-              <div className="mt-4 p-4 rounded-2xl bg-red-950/80 border-2 border-red-500/60 text-red-200 text-xs font-semibold flex items-start gap-3 relative z-10">
-                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                <div>
-                  <div className="font-bold text-white">Atenção no Preenchimento</div>
-                  <div className="text-red-200/90 mt-0.5">{nominationValidationError}</div>
+                {/* Slides Navigation */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 w-full">
+                  {presentationSlides.map((slide, idx) => (
+                    <button
+                      key={slide.id}
+                      onClick={() => handleSlideChange(idx)}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col items-center sm:items-start text-center sm:text-left gap-1 relative overflow-hidden ${
+                        currentSlide === idx
+                          ? 'bg-amber-500/20 border-amber-400 text-amber-200 shadow-xl shadow-amber-500/15'
+                          : 'bg-zinc-900/70 hover:bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${currentSlide === idx ? 'bg-amber-400 animate-pulse' : 'bg-zinc-700'}`} />
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider">
+                          Fase 0{idx + 1}
+                        </span>
+                      </div>
+                      <div className="font-bold text-xs truncate w-full text-white">{slide.title}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Slide Card Content */}
+                <div className="w-full relative rounded-3xl bg-gradient-to-b from-[#12131c] to-[#0a0b12] border-2 border-amber-500/40 p-6 sm:p-8 backdrop-blur-2xl shadow-2xl overflow-hidden">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-5 mb-5">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-center shrink-0">
+                        {currentSlideData.icon}
+                      </div>
+                      <div>
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-300 text-[10px] font-bold uppercase tracking-wider mb-1">
+                          {currentSlideData.badge}
+                        </div>
+                        <h3 className="text-xl sm:text-2xl font-black font-cinzel text-white">
+                          {currentSlideData.title}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <button
+                        onClick={() =>
+                          handleSlideChange(
+                            (currentSlide - 1 + presentationSlides.length) % presentationSlides.length
+                          )
+                        }
+                        className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-amber-300 transition-colors cursor-pointer"
+                        title="Slide Anterior"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleSlideChange((currentSlide + 1) % presentationSlides.length)
+                        }
+                        className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-amber-300 transition-colors cursor-pointer"
+                        title="Próximo Slide"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-base font-bold text-amber-300 mb-2 font-cinzel">
+                      {currentSlideData.subtitle}
+                    </h4>
+                    <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+                      {currentSlideData.description}
+                    </p>
+                  </div>
+
+                  {/* Highlights */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-4">
+                    {currentSlideData.highlights.map((item, i) => (
+                      <div
+                        key={i}
+                        className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-1.5"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-lg bg-zinc-800 border border-zinc-700">
+                            {item.icon}
+                          </div>
+                          <h5 className="font-bold text-xs text-white truncate">{item.label}</h5>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 leading-normal">{item.desc}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Success Alert */}
-            <AnimatePresence>
-              {showSuccessBadge && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                  className="mt-4 p-4 rounded-2xl bg-emerald-950/80 border-2 border-emerald-500/60 text-emerald-200 flex items-center gap-3 shadow-lg shadow-emerald-950/40 relative z-10"
-                >
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center shrink-0">
-                    <Check className="w-4 h-4 text-emerald-300" />
+            {/* TAB 3: INDICAÇÕES ENCERRADAS (COMUNICADO OFICIAL) */}
+            {activeTeaserTab === 'nominate' && (
+              <div className="w-full max-w-2xl mx-auto rounded-3xl bg-gradient-to-b from-[#151624] via-[#10111a] to-[#0a0b12] border-2 border-amber-500/50 p-6 sm:p-8 backdrop-blur-2xl shadow-2xl shadow-amber-950/40 text-left overflow-hidden relative">
+                {/* Ambient gold glow */}
+                <div className="absolute -top-16 -right-16 w-60 h-60 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+
+                {/* Header Closed Status */}
+                <div className="relative z-10 space-y-3 border-b border-zinc-800/80 pb-6 text-center">
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-red-500/20 border-2 border-red-500/60 text-red-300 animate-pulse">
+                    <Lock className="w-3.5 h-3.5 text-red-400" />
+                    <span>FASE DE INDICAÇÕES OFICIALMENTE ENCERRADA</span>
                   </div>
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-black text-emerald-300">
-                      Indicação Enviada com Sucesso! 👑
-                    </h4>
-                    <p className="text-[11px] text-emerald-200/90 mt-0.5">
-                      Sua indicação foi registrada com segurança e enviada diretamente para a comissão de <strong>Admins do XMA</strong>.
+
+                  <h3 className="text-2xl sm:text-3xl font-black font-cinzel text-white flex items-center justify-center gap-2">
+                    <span>Indicações Encerradas</span>
+                    <Trophy className="w-6 h-6 text-amber-400 shrink-0" />
+                  </h3>
+
+                  <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed max-w-lg mx-auto">
+                    O período de envio de sugestões da comunidade foi finalizado com sucesso. O comitê organizador oficial do <strong className="text-amber-300">XMA 2026</strong> já consolidou os indicados de cada categoria!
+                  </p>
+                </div>
+
+                {/* Status Box & Information */}
+                <div className="mt-6 space-y-4 relative z-10">
+                  <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-950/40 via-zinc-900/60 to-amber-950/40 border border-amber-500/30 space-y-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black text-amber-200 uppercase tracking-wide">
+                          Próxima Etapa: Votação Popular Aberta
+                        </h4>
+                        <p className="text-[11px] text-zinc-400">
+                          Data da Abertura das Urnas Oficiais
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-black/70 border border-zinc-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs font-bold text-zinc-200">15 de Setembro de 2026</span>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/30">
+                        19:00 (BRT)
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Assim que o cronômetro zerar, a plataforma abrirá instantaneamente para que todos os jogadores e fãs do PK XD votem nos seus criadores favoritos!
                     </p>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
-            {/* Form */}
-            <form onSubmit={handleNominationSubmit} className="mt-5 space-y-4 relative z-10">
-              {nominationTab === 'creator' ? (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                    {/* Nominee Name */}
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-amber-300/90 mb-1">
-                        Nome do Criador / Astro *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={nomineeName}
-                        onChange={(e) => setNomineeName(e.target.value)}
-                        placeholder="Ex: Luluca, Kawan XD, Peter..."
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
-                      />
-                    </div>
-
-                    {/* Nominee PK XD Tag */}
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                        #Tag PK XD do Indicado
-                      </label>
-                      <input
-                        type="text"
-                        value={nomineePkxdId}
-                        onChange={(e) => setNomineePkxdId(e.target.value)}
-                        placeholder="Ex: Admin#000, Nimda#000, Koosh#000"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Category Selection */}
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-amber-300/90 mb-1">
-                      Categoria do XMA 2026 *
-                    </label>
-                    <select
-                      value={selectedCategoryId}
-                      onChange={(e) => setSelectedCategoryId(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs outline-none transition-all cursor-pointer"
-                    >
-                      {categories.map((cat) => (
-                        <option key={cat.id} value={cat.id} className="bg-zinc-900 text-white">
-                          🏆 {cat.title}
-                        </option>
-                      ))}
-                      {categories.length === 0 && (
-                        <>
-                          <option value="cat-creator-ano" className="bg-zinc-900 text-white">🏆 Criador PK XD do Ano</option>
-                          <option value="cat-hit-musical" className="bg-zinc-900 text-white">🏆 Melhor Hit Musical PK XD</option>
-                          <option value="cat-clipe-visual" className="bg-zinc-900 text-white">🏆 Melhor Clipe & Produção Audiovisual</option>
-                          <option value="cat-estilo-look" className="bg-zinc-900 text-white">🏆 Melhor Look & Estilo Metálico</option>
-                          <option value="cat-revelacao-ano" className="bg-zinc-900 text-white">🏆 Revelação do Ano & Comunidade</option>
-                        </>
-                      )}
-                    </select>
-                  </div>
-
-                  {/* 3 Redes Sociais: Instagram, TikTok, YouTube (Pelo menos UMA obrigatória) */}
-                  <div className="p-3.5 rounded-2xl bg-zinc-950/90 border-2 border-amber-500/40 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Redes Sociais do Indicado (Obrigatório ao menos 1) *</span>
-                      </label>
-                      <span className="text-[10px] text-amber-400/90">Pode preencher as 3</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div>
-                        <div className="text-[10px] font-semibold text-zinc-300 mb-0.5 flex items-center gap-1">
-                          <Instagram className="w-3 h-3 text-pink-400" /> Instagram
-                        </div>
-                        <input
-                          type="text"
-                          value={nomineeInstagram}
-                          onChange={(e) => setNomineeInstagram(e.target.value)}
-                          placeholder="Ex: @criador ou link do Instagram"
-                          className="w-full px-3 py-1.5 rounded-xl bg-black border border-zinc-700/80 focus:border-amber-400 text-white text-xs placeholder:text-zinc-600 outline-none"
-                        />
+                  {/* Summary Metric Stats */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
+                    <div className="p-3.5 rounded-2xl bg-zinc-950/80 border border-zinc-800">
+                      <div className="text-lg sm:text-xl font-black font-cinzel text-amber-300">
+                        {categories.length}
                       </div>
-
-                      <div>
-                        <div className="text-[10px] font-semibold text-zinc-300 mb-0.5 flex items-center gap-1">
-                          <Video className="w-3 h-3 text-cyan-400" /> TikTok
-                        </div>
-                        <input
-                          type="text"
-                          value={nomineeTiktok}
-                          onChange={(e) => setNomineeTiktok(e.target.value)}
-                          placeholder="Ex: @criador ou link do TikTok"
-                          className="w-full px-3 py-1.5 rounded-xl bg-black border border-zinc-700/80 focus:border-amber-400 text-white text-xs placeholder:text-zinc-600 outline-none"
-                        />
+                      <div className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider mt-0.5">
+                        Categorias
                       </div>
+                    </div>
 
-                      <div>
-                        <div className="text-[10px] font-semibold text-zinc-300 mb-0.5 flex items-center gap-1">
-                          <Youtube className="w-3 h-3 text-red-500" /> YouTube
-                        </div>
-                        <input
-                          type="text"
-                          value={nomineeYoutube}
-                          onChange={(e) => setNomineeYoutube(e.target.value)}
-                          placeholder="Ex: @canal ou link do YouTube"
-                          className="w-full px-3 py-1.5 rounded-xl bg-black border border-zinc-700/80 focus:border-amber-400 text-white text-xs placeholder:text-zinc-600 outline-none"
-                        />
+                    <div className="p-3.5 rounded-2xl bg-zinc-950/80 border border-zinc-800">
+                      <div className="text-lg sm:text-xl font-black font-cinzel text-amber-300">
+                        {categories.reduce((acc, c) => acc + (c.nominees?.length || 0), 0)}
+                      </div>
+                      <div className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider mt-0.5">
+                        Indicados
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-zinc-950/80 border border-zinc-800 col-span-2 sm:col-span-1">
+                      <div className="text-lg sm:text-xl font-black font-cinzel text-emerald-400">
+                        100%
+                      </div>
+                      <div className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider mt-0.5">
+                        Auditado
                       </div>
                     </div>
                   </div>
 
-                  {/* Nominee Photo (Upload or URL) */}
-                  <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-zinc-800 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-amber-300/90 flex items-center gap-1.5">
-                        <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Foto do Indicado (Opcional - Real ou Link)</span>
-                      </label>
-                      {nomineeAvatarUrl && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNomineeAvatarUrl('');
-                            if (countdownFileInputRef.current) countdownFileInputRef.current.value = '';
-                          }}
-                          className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-0.5 cursor-pointer"
-                        >
-                          <X className="w-3 h-3" /> Remover
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <input
-                        type="file"
-                        ref={countdownFileInputRef}
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = (ev) => {
-                            if (ev.target?.result) setNomineeAvatarUrl(String(ev.target.result));
-                          };
-                          reader.readAsDataURL(file);
-                        }}
-                        className="w-full text-[10px] text-zinc-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-amber-500/20 file:text-amber-300 cursor-pointer bg-black/60 p-1 rounded-xl border border-zinc-700"
-                      />
-
-                      <input
-                        type="url"
-                        value={nomineeAvatarUrl.startsWith('data:') ? '' : nomineeAvatarUrl}
-                        onChange={(e) => setNomineeAvatarUrl(e.target.value)}
-                        placeholder="Ou cole o link da foto..."
-                        className="w-full px-3 py-1.5 rounded-xl bg-black border border-zinc-700/80 focus:border-amber-400 text-white text-xs placeholder:text-zinc-600 outline-none"
-                      />
-                    </div>
-
-                    {nomineeAvatarUrl && (
-                      <div className="flex items-center gap-2 pt-1">
-                        <img src={nomineeAvatarUrl} alt="Prévia" className="w-8 h-8 rounded-lg object-cover border border-amber-400" />
-                        <span className="text-[10px] text-emerald-300 font-semibold">✓ Foto carregada para envio!</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Reason / Work */}
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                      Por que você indica esse criador? (Obra / Motivo)
-                    </label>
-                    <input
-                      type="text"
-                      value={nominationReason}
-                      onChange={(e) => setNominationReason(e.target.value)}
-                      placeholder="Ex: Lançou o melhor clipe do ano, conteúdos diários divertidos..."
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Suggest New Category */}
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-amber-300/90 mb-1">
-                      Nome da Nova Categoria *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={customCategoryName}
-                      onChange={(e) => setCustomCategoryName(e.target.value)}
-                      placeholder="Ex: Melhor Casa Decorada, Streamer Mais Divertido, Melhor Paródia..."
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                      Por que essa categoria deve existir no XMA 2026?
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={nominationReason}
-                      onChange={(e) => setNominationReason(e.target.value)}
-                      placeholder="Explique a importância dessa premiação para a comunidade PK XD..."
-                      className="w-full px-3.5 py-2 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all resize-none"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Sender Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                    Seu Apelido / Nome
-                  </label>
-                  <input
-                    type="text"
-                    value={senderName}
-                    onChange={(e) => setSenderName(e.target.value)}
-                    placeholder="Ex: Pedro, Kawan, Jogador XD..."
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                    Sua Tag PK XD
-                  </label>
-                  <input
-                    type="text"
-                    value={senderPkxdTag}
-                    onChange={(e) => setSenderPkxdTag(e.target.value)}
-                    placeholder="Ex: Admin#000, Nimda#000, Koosh#000"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-700/80 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-white text-xs placeholder:text-zinc-600 outline-none transition-all font-mono"
-                  />
+                  {/* Quick Action to view Nominees */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTeaserTab('nominees')}
+                    className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-black font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xl shadow-amber-500/25 hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <Trophy className="w-4 h-4 text-black" />
+                    <span>Ver Indicados Confirmados</span>
+                    <ArrowRight className="w-4 h-4 text-black" />
+                  </button>
                 </div>
               </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-yellow-300 text-black font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xl shadow-amber-500/25 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <Send className="w-4 h-4 text-black" />
-                <span>{nominationTab === 'creator' ? 'Enviar Indicação de Criador' : 'Enviar Sugestão de Categoria'}</span>
-                <Sparkles className="w-4 h-4 text-black" />
-              </button>
-
-              {/* Confidentiality notice */}
-              <div className="pt-2 flex items-center justify-center gap-1.5 text-[11px] text-zinc-400 text-center">
-                <Lock className="w-3.5 h-3.5 text-amber-400" />
-                <span>Indicação sigilosa enviada exclusivamente para a comissão de <strong>Admins do XMA</strong></span>
-              </div>
-            </form>
+            )}
           </motion.div>
         </main>
       )}
@@ -1244,31 +1497,249 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
         </p>
       </footer>
 
-      {/* Epic Flash / Golden Explosion on Reveal */}
+      {/* Epic Flash / Golden Explosion on Reveal (Multi-Stage Ultra-Chic Entrance Animation) */}
       <AnimatePresence>
         {viewMode === 'revealing' && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 1.2 }}
-            className="fixed inset-0 z-50 bg-gradient-to-t from-amber-400 via-amber-200 to-white flex flex-col items-center justify-center text-black"
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="fixed inset-0 z-50 bg-[#030306] flex flex-col items-center justify-center text-white overflow-hidden select-none"
           >
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: [0.5, 1.2, 1], opacity: 1 }}
-              transition={{ duration: 1.2 }}
-              className="text-center space-y-4"
-            >
-              <Trophy className="w-24 h-24 mx-auto text-black animate-bounce" />
-              <h2 className="text-6xl sm:text-8xl font-black font-cinzel tracking-wider">
-                XMA 2026
-              </h2>
-              <p className="text-xl sm:text-2xl font-bold uppercase tracking-widest font-mono">
-                A CONTAGEM ENCERROU • APRESENTAÇÃO OFICIAL!
-              </p>
-            </motion.div>
+            {/* 1. Cinematic Curtains & Golden Atmospheric Beams (Hardware Accelerated z-0) */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+              {/* Grand Golden Ambient Radial Glow (Optimized blur and opacity) */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] sm:w-[1000px] h-[700px] sm:h-[1000px] bg-radial from-amber-400/20 via-yellow-600/10 to-transparent rounded-full blur-3xl transform-gpu animate-pulse" />
+
+              {/* Ultra Chic Soft Shimmering Light Beams (CSS animated for smooth 60fps) */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vw] h-36 bg-gradient-to-r from-transparent via-amber-300/15 to-transparent blur-xl pointer-events-none transform-gpu animate-[spin_20s_linear_infinite]" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vw] h-24 bg-gradient-to-r from-transparent via-yellow-200/10 to-transparent blur-xl pointer-events-none transform-gpu animate-[spin_28s_linear_infinite_reverse]" />
+
+              {/* Gentle Harmonic Wave Rings */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full border border-amber-300/30 pointer-events-none animate-ping duration-1000" />
+            </div>
+
+            {/* 2. Front Stage Interactive & Display Content (High z-index: z-30, strictly ABOVE confetti at z-25) */}
+            <div className="relative z-30 px-4 text-center max-w-5xl mx-auto space-y-6 pointer-events-auto">
+              {revealStage === 1 && (
+                <motion.div
+                  key="stage-1"
+                  initial={{ opacity: 0, scale: 0.9, y: 25 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 1.08, y: -20 }}
+                  transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                  className="space-y-6 flex flex-col items-center transform-gpu"
+                >
+                  <div className="w-28 h-28 sm:w-40 sm:h-40 rounded-[2rem] p-1.5 bg-gradient-to-tr from-amber-300 via-[#FFF8DC] to-amber-600 shadow-[0_0_60px_rgba(245,158,11,0.5)] flex items-center justify-center transform-gpu transition-transform hover:scale-105 duration-700">
+                    <div className="w-full h-full bg-[#08080f]/95 backdrop-blur-md rounded-[1.8rem] flex items-center justify-center">
+                      <Trophy className="w-14 h-14 sm:w-20 sm:h-20 text-amber-300 drop-shadow-[0_0_20px_rgba(255,215,0,0.8)] animate-pulse" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs sm:text-sm font-black uppercase tracking-[0.3em] font-mono bg-amber-400/20 border border-amber-400/60 text-amber-300 shadow-lg backdrop-blur-sm">
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                      <span>FASE 1 • ABERTURA DOS PORTÕES DOURADOS</span>
+                    </div>
+                    
+                    <h2 className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black font-cinzel tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-[#FFFFFF] via-[#FFE58F] to-[#D4AF37] drop-shadow-[0_10px_30px_rgba(245,158,11,0.5)] leading-none">
+                      PREPARE-SE
+                    </h2>
+
+                    <p className="text-xs sm:text-lg text-zinc-300 font-mono tracking-[0.2em] uppercase max-w-2xl mx-auto">
+                      A maior celebração da história do PK XD está começando...
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+
+              {revealStage === 2 && (
+                <motion.div
+                  key="stage-2"
+                  initial={{ opacity: 0, scale: 0.88, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 1.08, y: -20 }}
+                  transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                  className="space-y-6 flex flex-col items-center transform-gpu"
+                >
+                  <div className="w-32 h-32 sm:w-48 sm:h-48 rounded-full p-2 bg-gradient-to-tr from-amber-400 via-[#FFFDF0] to-yellow-600 shadow-[0_0_80px_rgba(255,215,0,0.7)] flex items-center justify-center transform-gpu">
+                    <div className="w-full h-full bg-[#080812] rounded-full flex items-center justify-center">
+                      <Sparkles className="w-16 h-16 sm:w-24 sm:h-24 text-amber-300 animate-spin duration-3000" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full text-xs sm:text-sm font-black uppercase tracking-[0.3em] font-mono bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-black shadow-xl">
+                      <Star className="w-3.5 h-3.5 text-black fill-black" />
+                      <span>GRANDE ESTREIA MUNDIAL</span>
+                      <Star className="w-3.5 h-3.5 text-black fill-black" />
+                    </div>
+
+                    <h1 className="text-6xl sm:text-8xl md:text-[10rem] lg:text-[12rem] font-black font-cinzel tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-[#FFFFFF] via-[#FFF2B2] to-[#C99700] drop-shadow-[0_15px_45px_rgba(245,158,11,0.7)] leading-none select-none">
+                      XMA 2026
+                    </h1>
+
+                    <p className="text-base sm:text-xl md:text-2xl font-black uppercase tracking-[0.3em] text-amber-300 font-mono drop-shadow-md">
+                      PK XD Music & Media Awards
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+
+              {revealStage === 3 && (
+                <motion.div
+                  key="stage-3"
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 1.05 }}
+                  transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                  className="space-y-6 flex flex-col items-center transform-gpu"
+                >
+                  <div className="w-32 h-32 sm:w-44 sm:h-44 rounded-[2rem] bg-gradient-to-tr from-amber-300 via-white to-amber-500 p-1.5 shadow-[0_0_80px_rgba(255,255,255,0.8)] flex items-center justify-center transform-gpu">
+                    <div className="w-full h-full bg-[#050508]/95 backdrop-blur-md rounded-[1.8rem] flex items-center justify-center">
+                      <Trophy className="w-16 h-16 sm:w-24 sm:h-24 text-amber-300 drop-shadow-[0_0_25px_rgba(245,158,11,0.8)]" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <span className="px-4 py-1.5 rounded-full text-xs sm:text-sm font-black uppercase tracking-[0.3em] font-mono bg-emerald-500/20 border border-emerald-400 text-emerald-300 shadow-lg backdrop-blur-sm">
+                      ✨ GALA & VOTAÇÃO OFICIALMENTE LIBERADAS ✨
+                    </span>
+
+                    <h2 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black font-cinzel text-white drop-shadow-[0_10px_30px_rgba(245,158,11,0.5)] leading-tight">
+                      BEM-VINDO À ARENA!
+                    </h2>
+
+                    <p className="text-xs sm:text-base text-zinc-300 max-w-xl mx-auto leading-relaxed">
+                      Carregando a experiência oficial de gala com som surround, indicados e votação...
+                    </p>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      onClick={() => setViewMode('presentation')}
+                      className="px-8 py-3.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-black font-black text-xs sm:text-sm uppercase tracking-widest transition-all shadow-xl shadow-amber-400/40 hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-2"
+                    >
+                      <Sparkles className="w-4 h-4 text-black" />
+                      <span>Acessar Cerimônia Agora</span>
+                      <ArrowRight className="w-4 h-4 text-black" />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Nominee Details Preview Modal in Countdown Screen */}
+      <AnimatePresence>
+        {selectedNomineePreview && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              className="relative w-full max-w-2xl bg-[#111218] border border-amber-500/40 rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.9),0_0_30px_rgba(212,175,55,0.2)] z-10 text-left"
+            >
+              {/* Header Banner */}
+              <div className="relative h-44 sm:h-52 bg-gradient-to-br from-[#1d1912] via-[#2a2315] to-[#12131a] overflow-hidden p-6 flex flex-col justify-between border-b border-amber-500/20">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(245,158,11,0.25),transparent_60%)]" />
+                <div className="absolute -right-10 -top-10 w-48 h-48 bg-amber-500/10 rounded-full blur-2xl" />
+
+                <div className="relative z-10 flex items-center justify-between">
+                  <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 border border-amber-400/40 text-amber-300">
+                    <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                    {selectedNomineePreview.category.title}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedNomineePreview(null)}
+                    className="w-9 h-9 rounded-full bg-black/60 border border-zinc-700 text-zinc-300 hover:text-white hover:border-amber-400 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="relative z-10">
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-cinzel">
+                    {selectedNomineePreview.nominee.name}
+                  </h2>
+                  <p className="text-amber-400/90 text-sm font-semibold">{selectedNomineePreview.nominee.handle}</p>
+                </div>
+              </div>
+
+              {/* Body Content */}
+              <div className="p-6 sm:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+                {/* Avatar & Key Stats */}
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+                  <div className="relative group shrink-0">
+                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl p-1 bg-gradient-to-tr from-amber-500 via-amber-200 to-amber-700 shadow-xl shadow-amber-500/20">
+                      <img
+                        src={selectedNomineePreview.nominee.avatarUrl}
+                        alt={selectedNomineePreview.nominee.name}
+                        className="w-full h-full object-cover rounded-xl bg-black"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 text-center sm:text-left space-y-2">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                      <span className="px-3 py-1 rounded-lg text-xs font-mono font-bold bg-zinc-900 border border-zinc-700 text-zinc-300">
+                        ID PK XD: {selectedNomineePreview.nominee.pkxdId}
+                      </span>
+                      {selectedNomineePreview.nominee.badge && (
+                        <span className="px-3 py-1 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500/30 to-amber-300/10 border border-amber-400 text-amber-300">
+                          {selectedNomineePreview.nominee.badge}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-zinc-300 text-sm leading-relaxed">
+                      {selectedNomineePreview.nominee.bio}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Project / Work Nominated */}
+                <div className="p-5 rounded-2xl bg-[#161722] border border-zinc-800 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
+                    <Award className="w-4 h-4" />
+                    <span>Obra / Projeto Indicado</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-white">
+                    {selectedNomineePreview.nominee.projectTitle}
+                  </h3>
+                  <p className="text-zinc-400 text-sm">
+                    {selectedNomineePreview.nominee.projectDescription}
+                  </p>
+                </div>
+
+                {/* Status notice */}
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-400/30 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-amber-400/20 flex items-center justify-center text-amber-300 shrink-0">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="text-xs text-amber-200/90">
+                    <strong>Indicado Oficial Confirmado.</strong> As votações oficiais abrirão pontualmente no encerramento da contagem regressiva em 15 de Setembro às 19:00!
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedNomineePreview(null)}
+                    className="px-6 py-2.5 rounded-xl text-sm font-bold bg-zinc-800 hover:bg-zinc-700 text-white transition-colors cursor-pointer"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 

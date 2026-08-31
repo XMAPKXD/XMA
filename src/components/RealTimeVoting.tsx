@@ -28,6 +28,7 @@ interface RealTimeVotingProps {
   onVerifiedSingleVote: (categoryId: string, nomineeId: string) => void;
   onSelectNominee: (nominee: Nominee, category: Category) => void;
   onOpenLoginModal: () => void;
+  onSwitchToAdmin?: () => void;
 }
 
 export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
@@ -37,7 +38,8 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
   onMassVote,
   onVerifiedSingleVote,
   onSelectNominee,
-  onOpenLoginModal
+  onOpenLoginModal,
+  onSwitchToAdmin
 }) => {
   const [activeCategoryIndex, setActiveCategoryIndex] = useState<number>(0);
   const [votingMode, setVotingMode] = useState<'mass' | 'verified'>('mass');
@@ -264,9 +266,17 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
                   <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
                     Categoria {activeCategoryIndex + 1} de {totalCategories}
                   </span>
-                  {currentCategory.status === 'winner_revealed' && (
+                  {currentCategory.status === 'winner_revealed' ? (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-black">
                       Vencedor Oficial Apurado
+                    </span>
+                  ) : currentCategory.status === 'voting_open' ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      Urnas Abertas
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      Apresentação dos Indicados
                     </span>
                   )}
                 </div>
@@ -279,24 +289,58 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
               </div>
 
               <div className="text-right">
-                <div className="text-xs text-zinc-400">Total de votos computados</div>
+                <div className="text-xs text-zinc-400">
+                  {currentCategory.status === 'voting_open' ? 'Total de votos computados' : 'Status da Disputa'}
+                </div>
                 <div className="text-xl font-extrabold text-amber-300 font-mono">
-                  {totalCategoryVotes.toLocaleString('pt-BR')}
+                  {currentCategory.status === 'voting_open'
+                    ? totalCategoryVotes.toLocaleString('pt-BR')
+                    : 'Apresentação Oficial'}
                 </div>
               </div>
             </div>
 
+            {/* Voting Closed / Showcase Alert */}
+            {currentCategory.status !== 'voting_open' && currentCategory.status !== 'winner_revealed' && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-transparent border border-amber-400/40 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
+                  <Sparkles className="w-5 h-5 animate-pulse" />
+                </div>
+                <div className="text-xs space-y-0.5">
+                  <div className="font-bold text-amber-300">
+                    Fase de Conhecer os Indicados Oficiais
+                  </div>
+                  <div className="text-zinc-300">
+                    As urnas desta categoria estão no momento em modo de exibição. Conheça cada criador e obra abaixo antes da abertura oficial dos votos!
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Nominees Cards */}
             <div className="space-y-4">
               {currentCategory.nominees.length === 0 ? (
-                <div className="p-8 rounded-3xl bg-[#14151e] border border-zinc-800 text-center space-y-3">
+                <div className="p-8 rounded-3xl bg-[#14151e] border border-zinc-800 text-center space-y-4">
                   <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-400/20 flex items-center justify-center mx-auto text-amber-400">
                     <Trophy className="w-6 h-6" />
                   </div>
-                  <h3 className="text-base font-bold text-white font-cinzel">Nenhum indicado cadastrado nesta categoria</h3>
-                  <p className="text-xs text-zinc-400 max-w-md mx-auto">
-                    Os Admins XMA podem cadastrar novos indicados pelo painel administrativo ou aprovar sugestões da comunidade.
-                  </p>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-white font-cinzel">Nenhum indicado cadastrado nesta categoria ainda</h3>
+                    <p className="text-xs text-zinc-400 max-w-md mx-auto">
+                      O Administrador pode cadastrar os indicados oficiais no Painel de Controle dos Admins.
+                    </p>
+                  </div>
+                  {onSwitchToAdmin && (
+                    <div>
+                      <button
+                        onClick={onSwitchToAdmin}
+                        className="px-5 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/50 text-amber-300 font-bold text-xs inline-flex items-center gap-2 cursor-pointer transition-colors"
+                      >
+                        <Crown className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Cadastrar Indicados no Painel Admin</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 currentCategory.nominees.map((nominee) => {
@@ -375,9 +419,13 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
                       {/* Vote Buttons & Controls */}
                       <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-800">
                         <div className="text-left sm:text-right">
-                          <div className="text-xs text-zinc-400">Total de votos</div>
+                          <div className="text-xs text-zinc-400">
+                            {currentCategory.status === 'voting_open' ? 'Total de votos' : 'Status'}
+                          </div>
                           <div className="text-base font-extrabold text-amber-300 font-mono">
-                            {nominee.votes.toLocaleString('pt-BR')} ({percentage}%)
+                            {currentCategory.status === 'voting_open' 
+                              ? `${nominee.votes.toLocaleString('pt-BR')} (${percentage}%)`
+                              : 'Indicado Oficial'}
                           </div>
                         </div>
 
@@ -417,30 +465,44 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
                             </button>
                           )
                         ) : (
-                          <span className="text-xs font-bold text-zinc-500 px-3 py-1 bg-zinc-900 rounded-lg border border-zinc-800">
-                            Votação Encerrada
-                          </span>
+                          <button
+                            onClick={() => onSelectNominee(nominee, currentCategory)}
+                            className="px-4 py-2 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-amber-300 hover:text-amber-200 border border-amber-500/40 hover:border-amber-400 flex items-center gap-1.5 cursor-pointer transition-all shadow-md"
+                          >
+                            <Info className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Conhecer Obra</span>
+                          </button>
                         )}
                       </div>
                     </div>
 
-                    {/* Live Progress Bar */}
-                    <div className="mt-4 pt-3 border-t border-zinc-800/80 space-y-1.5">
-                      <div className="w-full h-2.5 bg-zinc-800/90 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${percentage}%` }}
-                          transition={{ duration: 0.6, ease: 'easeOut' }}
-                          className={`h-full rounded-full ${
-                            isVerifiedVoted
-                              ? 'bg-gradient-to-r from-emerald-400 via-amber-300 to-amber-500 shadow-md'
-                              : isLeader
-                              ? 'bg-gradient-to-r from-amber-500 via-amber-300 to-amber-500'
-                              : 'bg-gradient-to-r from-slate-400 to-slate-600'
-                          }`}
-                        />
+                    {/* Live Progress Bar or Showcase Pill */}
+                    {currentCategory.status === 'voting_open' ? (
+                      <div className="mt-4 pt-3 border-t border-zinc-800/80 space-y-1.5">
+                        <div className="w-full h-2.5 bg-zinc-800/90 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${percentage}%` }}
+                            transition={{ duration: 0.6, ease: 'easeOut' }}
+                            className={`h-full rounded-full ${
+                              isVerifiedVoted
+                                ? 'bg-gradient-to-r from-emerald-400 via-amber-300 to-amber-500 shadow-md'
+                                : isLeader
+                                ? 'bg-gradient-to-r from-amber-500 via-amber-300 to-amber-500'
+                                : 'bg-gradient-to-r from-slate-400 to-slate-600'
+                            }`}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="mt-3 pt-2.5 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400">
+                        <span className="text-amber-400/90 font-medium flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-amber-400" />
+                          Indicado Oficial ao Troféu XMA
+                        </span>
+                        <span className="text-zinc-500">Urnas fecham para apuração / abrirão no evento</span>
+                      </div>
+                    )}
 
                     {/* Celebration Banner */}
                     <AnimatePresence>

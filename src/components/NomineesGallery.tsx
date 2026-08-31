@@ -9,6 +9,7 @@ interface NomineesGalleryProps {
   onVote: (categoryId: string, nomineeId: string) => void;
   onSelectNominee: (nominee: Nominee, category: Category) => void;
   onSwitchToCeremony: () => void;
+  onSwitchToAdmin?: () => void;
 }
 
 export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
@@ -16,7 +17,8 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
   userVotes,
   onVote,
   onSelectNominee,
-  onSwitchToCeremony
+  onSwitchToCeremony,
+  onSwitchToAdmin
 }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -63,7 +65,7 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
               Estrelas do <span className="text-gold-metallic">Multiverso PK XD</span>
             </h1>
             <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-              Explore todos os talentos indicados ao cobiçado Troféu XMA. Conheça as produções audiovisuais, hits musicais e os maiores criadores da comunidade.
+              Explore os talentos e produções indicadas ao Troféu XMA. Todos os indicados oficiais são gerenciados diretamente pelo painel administrativo.
             </p>
           </div>
 
@@ -76,14 +78,14 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
               </span>
             </div>
             <div className="text-2xl font-black font-cinzel text-white">
-              5 Grandes Categorias
+              {categories.length} Categorias
             </div>
             <button
               onClick={onSwitchToCeremony}
               className="w-full py-2 px-4 rounded-xl bg-gold-metallic-btn text-black font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
             >
               <Trophy className="w-4 h-4" />
-              <span>Assistir Cerimônia ao Vivo</span>
+              <span>Assistir Cerimônia</span>
             </button>
           </div>
         </div>
@@ -100,7 +102,7 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
                   : 'bg-zinc-900/80 text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-800'
               }`}
             >
-              Todas as Categorias
+              Todas as Categorias ({categories.length})
             </button>
 
             {categories.map((cat) => (
@@ -114,6 +116,9 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
                 }`}
               >
                 <span>{cat.title}</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/40 text-zinc-300">
+                  {cat.nominees.length}
+                </span>
                 {cat.status === 'winner_revealed' && (
                   <Trophy className="w-3 h-3 text-amber-300" />
                 )}
@@ -175,9 +180,13 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
                           <Trophy className="w-3 h-3" />
                           Vencedor Revelado
                         </span>
-                      ) : (
+                      ) : category.status === 'voting_open' ? (
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/20 border border-emerald-400/40 text-emerald-300">
                           Votação Aberta
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/20 border border-amber-400/40 text-amber-300">
+                          Indicados Oficiais • Votação em Breve
                         </span>
                       )}
                     </div>
@@ -189,29 +198,44 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
 
                 <div className="text-xs text-zinc-400 flex items-center gap-2 self-start sm:self-auto">
                   <Flame className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Total da Categoria:</span>
+                  <span>{category.status === 'voting_open' ? 'Total da Categoria:' : 'Status da Urna:'}</span>
                   <strong className="text-amber-300 font-bold">
-                    {totalCatVotes.toLocaleString('pt-BR')} votos
+                    {category.status === 'voting_open' 
+                      ? `${totalCatVotes.toLocaleString('pt-BR')} votos` 
+                      : 'Apresentação de Indicados'}
                   </strong>
                 </div>
               </div>
 
               {/* Nominees Grid */}
               {category.nominees.length === 0 ? (
-                <div className="p-8 rounded-3xl bg-[#14151e]/60 border border-zinc-800/80 text-center space-y-3">
+                <div className="p-8 rounded-3xl bg-[#14151e]/60 border border-zinc-800/80 text-center space-y-4">
                   <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-400/20 flex items-center justify-center mx-auto text-amber-400">
                     <Trophy className="w-6 h-6" />
                   </div>
-                  <h4 className="text-base font-bold text-white font-cinzel">Nenhum indicado cadastrado nesta categoria</h4>
-                  <p className="text-xs text-zinc-400 max-w-md mx-auto">
-                    Os Admins XMA podem cadastrar novos indicados pelo painel administrativo ou aprovar sugestões enviadas pela comunidade.
-                  </p>
+                  <div className="space-y-1">
+                    <h4 className="text-base font-bold text-white font-cinzel">Nenhum indicado cadastrado nesta categoria ainda</h4>
+                    <p className="text-xs text-zinc-400 max-w-md mx-auto">
+                      Os indicados são adicionados diretamente pelo Administrador no Painel de Controle ou a partir das sugestões da comunidade.
+                    </p>
+                  </div>
+                  {onSwitchToAdmin && (
+                    <div>
+                      <button
+                        onClick={onSwitchToAdmin}
+                        className="px-5 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/50 text-amber-300 font-bold text-xs inline-flex items-center gap-2 cursor-pointer transition-colors"
+                      >
+                        <Crown className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Adicionar Indicados no Painel Admin</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {category.nominees.map((nominee) => {
                   const rankIndex = sortedNominees.findIndex((n) => n.id === nominee.id);
-                  const isLeader = rankIndex === 0;
+                  const isLeader = rankIndex === 0 && totalCatVotes > 0;
                   const isWinner =
                     category.status === 'winner_revealed' &&
                     category.winnerNomineeId === nominee.id;
@@ -248,7 +272,7 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-black/60 border border-zinc-700 text-zinc-400 backdrop-blur-md">
-                            #{rankIndex + 1}
+                            Indicado Oficial
                           </span>
                         )}
                       </div>
@@ -276,7 +300,9 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
                             {nominee.pkxdId}
                           </span>
                           <span className="text-[11px] font-bold text-amber-300/90">
-                            {percentage}% dos votos
+                            {category.status === 'voting_open' && totalCatVotes > 0
+                              ? `${percentage}% dos votos`
+                              : 'Concorrente Oficial'}
                           </span>
                         </div>
                       </div>
@@ -298,67 +324,79 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
                           </p>
                         </div>
 
-                        {/* Vote Percentage Progress */}
-                        <div className="space-y-1.5 pt-2 border-t border-zinc-800/80">
-                          <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                            <span>Votos apurados:</span>
-                            <span className="font-bold text-zinc-200">
-                              {nominee.votes.toLocaleString('pt-BR')}
-                            </span>
+                        {/* Progress / Status display */}
+                        {category.status === 'voting_open' ? (
+                          <div className="space-y-1.5 pt-2 border-t border-zinc-800/80">
+                            <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                              <span>Votos apurados:</span>
+                              <span className="font-bold text-zinc-200">
+                                {nominee.votes.toLocaleString('pt-BR')}
+                              </span>
+                            </div>
+                            <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                              <div
+                                style={{ width: `${percentage}%` }}
+                                className={`h-full rounded-full ${
+                                  isWinner
+                                    ? 'bg-gradient-to-r from-amber-400 to-amber-600'
+                                    : isLeader
+                                    ? 'bg-gradient-to-r from-amber-500 to-amber-300'
+                                    : 'bg-gradient-to-r from-slate-400 to-slate-600'
+                                }`}
+                              />
+                            </div>
                           </div>
-                          <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-                            <div
-                              style={{ width: `${percentage}%` }}
-                              className={`h-full rounded-full ${
-                                isWinner
-                                  ? 'bg-gradient-to-r from-amber-400 to-amber-600'
-                                  : isLeader
-                                  ? 'bg-gradient-to-r from-amber-500 to-amber-300'
-                                  : 'bg-gradient-to-r from-slate-400 to-slate-600'
-                              }`}
-                            />
+                        ) : (
+                          <div className="pt-2 border-t border-zinc-800/80">
+                            <div className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300/90 font-medium text-center">
+                              ✨ Indicado ao Troféu XMA 2026
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                         {/* Action Buttons */}
-                        <div className="grid grid-cols-2 gap-2 pt-1">
-                          <button
-                            id={`view-details-${nominee.id}`}
-                            onClick={() => onSelectNominee(nominee, category)}
-                            className="py-2 px-3 rounded-xl text-xs font-semibold bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-200 border border-zinc-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-zinc-400" />
-                            <span>Detalhes</span>
-                          </button>
-
+                        <div className="pt-1">
                           {category.status === 'voting_open' ? (
-                            <button
-                              id={`card-vote-btn-${nominee.id}`}
-                              onClick={() => onVote(category.id, nominee.id)}
-                              className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                                isUserVoted
-                                  ? 'bg-emerald-600 text-white shadow-md'
-                                  : 'bg-gold-metallic-btn text-black'
-                              }`}
-                            >
-                              {isUserVoted ? (
-                                <>
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span>Votado</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Crown className="w-3.5 h-3.5" />
-                                  <span>Votar</span>
-                                </>
-                              )}
-                            </button>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                id={`view-details-${nominee.id}`}
+                                onClick={() => onSelectNominee(nominee, category)}
+                                className="py-2 px-3 rounded-xl text-xs font-semibold bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-200 border border-zinc-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-zinc-400" />
+                                <span>Detalhes</span>
+                              </button>
+
+                              <button
+                                id={`card-vote-btn-${nominee.id}`}
+                                onClick={() => onVote(category.id, nominee.id)}
+                                className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                  isUserVoted
+                                    ? 'bg-emerald-600 text-white shadow-md'
+                                    : 'bg-gold-metallic-btn text-black'
+                                }`}
+                              >
+                                {isUserVoted ? (
+                                  <>
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Votado</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Crown className="w-3.5 h-3.5" />
+                                    <span>Votar</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           ) : (
                             <button
-                              disabled
-                              className="py-2 px-3 rounded-xl text-xs font-bold bg-zinc-900 text-zinc-600 border border-zinc-800 flex items-center justify-center cursor-not-allowed"
+                              id={`view-details-${nominee.id}`}
+                              onClick={() => onSelectNominee(nominee, category)}
+                              className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-amber-300 hover:text-amber-200 border border-amber-500/40 hover:border-amber-400 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md group"
                             >
-                              Encerrada
+                              <Eye className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                              <span>Conhecer Perfil & Obra</span>
                             </button>
                           )}
                         </div>
