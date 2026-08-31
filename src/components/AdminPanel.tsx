@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Category, 
   Nominee, 
@@ -38,7 +38,11 @@ import {
   Activity,
   Instagram,
   Video,
-  Youtube
+  Youtube,
+  Upload,
+  Image as ImageIcon,
+  Camera,
+  X
 } from 'lucide-react';
 import { triggerWinnerTrophyBlast, triggerGoldenConfetti } from '../utils/confetti';
 import { playFanfare, playAdminGavel, playVoteChime } from '../utils/audio';
@@ -95,31 +99,50 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Nominee form state
   const [isAddingNominee, setIsAddingNominee] = useState<boolean>(false);
   const [editingNomineeId, setEditingNomineeId] = useState<string | null>(null);
+  const nomineeFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [showUrlInput, setShowUrlInput] = useState<boolean>(false);
+
   const [nomineeForm, setNomineeForm] = useState<{
     name: string;
     handle: string;
     avatarUrl: string;
     categoryId: string;
-    projectTitle: string;
-    projectDescription: string;
-    projectType: Nominee['projectType'];
-    pkxdId: string;
-    bio: string;
-    badge: string;
+    reason: string;
     votes: number;
   }>({
     name: '',
     handle: '',
-    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
+    avatarUrl: '',
     categoryId: categories[0]?.id || '',
-    projectTitle: '',
-    projectDescription: '',
-    projectType: 'media_creator',
-    pkxdId: '#PKXD1000',
-    bio: '',
-    badge: '',
-    votes: 1000
+    reason: '',
+    votes: 0
   });
+
+  // Handle local image file upload from mobile or desktop
+  const handleNomineePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A foto é muito grande. Escolha uma imagem de até 5MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setNomineeForm((prev) => ({ ...prev, avatarUrl: String(event.target?.result) }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveNomineePhoto = () => {
+    setNomineeForm((prev) => ({ ...prev, avatarUrl: '' }));
+    if (nomineeFileInputRef.current) {
+      nomineeFileInputRef.current.value = '';
+    }
+  };
 
   // Category form state
   const [isAddingCategory, setIsAddingCategory] = useState<boolean>(false);
@@ -201,6 +224,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     e.preventDefault();
     if (!nomineeForm.name.trim() || !nomineeForm.categoryId) return;
 
+    const cleanHandle = nomineeForm.handle.trim()
+      ? (nomineeForm.handle.trim().startsWith('@') ? nomineeForm.handle.trim() : `@${nomineeForm.handle.trim()}`)
+      : '';
+
+    const cleanAvatar = nomineeForm.avatarUrl.trim() || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80';
+    const totalVotes = Number(nomineeForm.votes) || 0;
+
     if (editingNomineeId) {
       // Edit existing
       const updated = categories.map((cat) => {
@@ -210,8 +240,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             if (n.id === editingNomineeId) {
               return {
                 ...n,
-                ...nomineeForm,
-                categoryId: nomineeForm.categoryId
+                name: nomineeForm.name.trim(),
+                handle: cleanHandle,
+                avatarUrl: cleanAvatar,
+                categoryId: nomineeForm.categoryId,
+                projectTitle: nomineeForm.reason.trim() || 'Indicado Oficial XMA 2026',
+                projectDescription: nomineeForm.reason.trim() || '',
+                bio: nomineeForm.reason.trim() || '',
+                pkxdId: cleanHandle || `#${nomineeForm.name.replace(/\s+/g, '').slice(0, 8)}`,
+                votes: totalVotes,
+                verifiedVotes: Math.round(totalVotes * 0.75),
+                massVotes: Math.round(totalVotes * 0.25)
               };
             }
             return n;
@@ -224,7 +263,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       // Create new
       const newNominee: Nominee = {
         id: `nom-${Date.now()}`,
-        ...nomineeForm
+        name: nomineeForm.name.trim(),
+        handle: cleanHandle,
+        avatarUrl: cleanAvatar,
+        categoryId: nomineeForm.categoryId,
+        projectTitle: nomineeForm.reason.trim() || 'Indicado Oficial XMA 2026',
+        projectDescription: nomineeForm.reason.trim() || '',
+        projectType: 'media_creator',
+        pkxdId: cleanHandle || `#${nomineeForm.name.replace(/\s+/g, '').slice(0, 8)}`,
+        bio: nomineeForm.reason.trim() || '',
+        votes: totalVotes,
+        verifiedVotes: Math.round(totalVotes * 0.75),
+        massVotes: Math.round(totalVotes * 0.25)
       };
       const updated = categories.map((cat) => {
         if (cat.id === nomineeForm.categoryId) {
@@ -243,16 +293,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setNomineeForm({
       name: '',
       handle: '',
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
+      avatarUrl: '',
       categoryId: categories[0]?.id || '',
-      projectTitle: '',
-      projectDescription: '',
-      projectType: 'media_creator',
-      pkxdId: '#PKXD1000',
-      bio: '',
-      badge: '',
-      votes: 1000
+      reason: '',
+      votes: 0
     });
+    if (nomineeFileInputRef.current) {
+      nomineeFileInputRef.current.value = '';
+    }
     playVoteChime();
   };
 
@@ -725,54 +773,48 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {/* Nominee Form */}
             {isAddingNominee && (
-              <form onSubmit={handleSaveNominee} className="p-6 rounded-2xl bg-zinc-900 border-2 border-amber-500/40 space-y-4 shadow-xl">
-                <h3 className="text-sm font-bold text-amber-300 font-cinzel">
-                  {editingNomineeId ? 'Editar Indicado' : 'Cadastrar Novo Indicado ao Troféu XMA'}
-                </h3>
+              <form onSubmit={handleSaveNominee} className="p-6 rounded-2xl bg-[#161722] border-2 border-amber-500/40 space-y-5 shadow-2xl">
+                <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                  <div className="space-y-0.5">
+                    <h3 className="text-base font-bold text-amber-300 font-cinzel flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <span>{editingNomineeId ? 'Editar Indicado' : 'Cadastrar Novo Indicado'}</span>
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Preencha o nome e selecione a foto direto do seu celular ou arquivo.
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold text-amber-400/80 bg-amber-400/10 px-2.5 py-1 rounded-full border border-amber-400/30">
+                    XMA 2026
+                  </span>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
-                  <div>
-                    <label className="block text-zinc-400 mb-1 font-semibold">Nome do Astro / Criador *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  {/* 1. Nome do Indicado (Obrigatório) */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-zinc-200 mb-1.5 font-bold text-xs flex items-center justify-between">
+                      <span>Nome do Astro / Indicado <span className="text-amber-400">*</span></span>
+                      <span className="text-[10px] text-amber-400/80 font-normal">Obrigatório</span>
+                    </label>
                     <input
                       type="text"
                       required
                       value={nomineeForm.name}
                       onChange={(e) => setNomineeForm({ ...nomineeForm, name: e.target.value })}
-                      placeholder="Ex: Luna Starlight"
-                      className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
+                      placeholder="Ex: Luna Starlight, Peter PK, etc."
+                      className="w-full px-3.5 py-2.5 bg-black/80 border border-zinc-700 rounded-xl text-white text-sm focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/50"
                     />
                   </div>
 
+                  {/* 2. Categoria */}
                   <div>
-                    <label className="block text-zinc-400 mb-1 font-semibold">Handle (@) *</label>
-                    <input
-                      type="text"
-                      required
-                      value={nomineeForm.handle}
-                      onChange={(e) => setNomineeForm({ ...nomineeForm, handle: e.target.value })}
-                      placeholder="@lunastarlight_xd"
-                      className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-zinc-400 mb-1 font-semibold">ID PK XD (#) *</label>
-                    <input
-                      type="text"
-                      required
-                      value={nomineeForm.pkxdId}
-                      onChange={(e) => setNomineeForm({ ...nomineeForm, pkxdId: e.target.value })}
-                      placeholder="#LUNA4402"
-                      className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-zinc-400 mb-1 font-semibold">Categoria Indicada *</label>
+                    <label className="block text-zinc-200 mb-1.5 font-bold text-xs">
+                      Categoria Indicada <span className="text-amber-400">*</span>
+                    </label>
                     <select
                       value={nomineeForm.categoryId}
                       onChange={(e) => setNomineeForm({ ...nomineeForm, categoryId: e.target.value })}
-                      className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
+                      className="w-full px-3.5 py-2.5 bg-black/80 border border-zinc-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400"
                     >
                       {categories.map((c) => (
                         <option key={c.id} value={c.id}>{c.title}</option>
@@ -780,75 +822,154 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </select>
                   </div>
 
+                  {/* 3. Handle / @ (Opcional) */}
                   <div>
-                    <label className="block text-zinc-400 mb-1 font-semibold">Título do Trabalho Indicado *</label>
+                    <label className="block text-zinc-300 mb-1.5 font-semibold text-xs flex items-center justify-between">
+                      <span>@ Perfil / Rede Social</span>
+                      <span className="text-[10px] text-zinc-500 font-normal">Não obrigatório</span>
+                    </label>
                     <input
                       type="text"
-                      required
-                      value={nomineeForm.projectTitle}
-                      onChange={(e) => setNomineeForm({ ...nomineeForm, projectTitle: e.target.value })}
-                      placeholder="Ex: Maratona Fashion & Tours"
-                      className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
+                      value={nomineeForm.handle}
+                      onChange={(e) => setNomineeForm({ ...nomineeForm, handle: e.target.value })}
+                      placeholder="Ex: @lunastarlight_xd (Opcional)"
+                      className="w-full px-3.5 py-2.5 bg-black/80 border border-zinc-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-zinc-400 mb-1 font-semibold">Foto / Avatar URL *</label>
-                    <input
-                      type="url"
-                      required
-                      value={nomineeForm.avatarUrl}
-                      onChange={(e) => setNomineeForm({ ...nomineeForm, avatarUrl: e.target.value })}
-                      className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
-                    />
+                  {/* 4. Foto do Indicado (Upload direto do celular ou URL) */}
+                  <div className="sm:col-span-2 p-4 rounded-xl bg-black/50 border border-zinc-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-zinc-200 font-bold text-xs flex items-center gap-2">
+                        <Camera className="w-4 h-4 text-amber-400" />
+                        <span>Foto do Indicado (Do Celular ou Galeria)</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowUrlInput(!showUrlInput)}
+                        className="text-[11px] text-amber-400 hover:underline cursor-pointer"
+                      >
+                        {showUrlInput ? 'Ocultar Link URL' : 'Prefere colar link URL?'}
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      {/* Avatar Preview */}
+                      <div className="relative shrink-0">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl p-1 bg-gradient-to-tr from-amber-400 to-amber-700 shadow-md">
+                          {nomineeForm.avatarUrl ? (
+                            <img
+                              src={nomineeForm.avatarUrl}
+                              alt="Foto selecionada"
+                              className="w-full h-full object-cover rounded-xl bg-zinc-900"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-zinc-900 rounded-xl flex flex-col items-center justify-center text-zinc-500 gap-1">
+                              <ImageIcon className="w-6 h-6 text-zinc-600" />
+                              <span className="text-[9px] uppercase font-bold">Sem Foto</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Upload Controls */}
+                      <div className="flex-1 space-y-2 w-full text-center sm:text-left">
+                        <input
+                          ref={nomineeFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleNomineePhotoUpload}
+                          className="hidden"
+                        />
+
+                        <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
+                          <button
+                            type="button"
+                            onClick={() => nomineeFileInputRef.current?.click()}
+                            className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-xs inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-amber-400/20 transition-all hover:scale-[1.02]"
+                          >
+                            <Upload className="w-4 h-4 text-black" />
+                            <span>{nomineeForm.avatarUrl ? 'Trocar Foto do Celular' : '📱 Escolher Foto do Celular'}</span>
+                          </button>
+
+                          {nomineeForm.avatarUrl && (
+                            <button
+                              type="button"
+                              onClick={handleRemoveNomineePhoto}
+                              className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-red-300 hover:text-red-200 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Remover Foto</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <p className="text-[11px] text-zinc-400">
+                          Toque no botão para abrir sua galeria ou câmera do celular (PNG, JPG, WebP).
+                        </p>
+                      </div>
+                    </div>
+
+                    {showUrlInput && (
+                      <div className="pt-2 border-t border-zinc-800">
+                        <label className="block text-zinc-400 mb-1 text-[11px]">Ou digite / cole o link URL da foto:</label>
+                        <input
+                          type="url"
+                          value={nomineeForm.avatarUrl}
+                          onChange={(e) => setNomineeForm({ ...nomineeForm, avatarUrl: e.target.value })}
+                          placeholder="https://..."
+                          className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                    )}
                   </div>
 
+                  {/* 5. Motivo / Observação (Opcional) */}
                   <div className="sm:col-span-2">
-                    <label className="block text-zinc-400 mb-1 font-semibold">Resumo do Trabalho / Produção</label>
+                    <label className="block text-zinc-300 mb-1 font-semibold text-xs flex items-center justify-between">
+                      <span>Motivo da Indicação / Observação</span>
+                      <span className="text-[10px] text-zinc-500 font-normal">Não obrigatório</span>
+                    </label>
                     <input
                       type="text"
-                      value={nomineeForm.projectDescription}
-                      onChange={(e) => setNomineeForm({ ...nomineeForm, projectDescription: e.target.value })}
-                      placeholder="Descrição rápida do trabalho"
-                      className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
+                      value={nomineeForm.reason}
+                      onChange={(e) => setNomineeForm({ ...nomineeForm, reason: e.target.value })}
+                      placeholder="Ex: Pelo clipe oficial de 2026, destaque da comunidade, etc. (Opcional)"
+                      className="w-full px-3.5 py-2.5 bg-black/80 border border-zinc-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400"
                     />
                   </div>
 
+                  {/* 6. Votos Iniciais (Opcional) */}
                   <div>
-                    <label className="block text-zinc-400 mb-1 font-semibold">Votos Iniciais</label>
+                    <label className="block text-zinc-400 mb-1 font-semibold text-xs flex items-center justify-between">
+                      <span>Votos Iniciais</span>
+                      <span className="text-[10px] text-zinc-500">Padrão 0</span>
+                    </label>
                     <input
                       type="number"
                       value={nomineeForm.votes}
                       onChange={(e) => setNomineeForm({ ...nomineeForm, votes: parseInt(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-3">
-                    <label className="block text-zinc-400 mb-1 font-semibold">Biografia / Descrição do Indicado</label>
-                    <textarea
-                      rows={2}
-                      value={nomineeForm.bio}
-                      onChange={(e) => setNomineeForm({ ...nomineeForm, bio: e.target.value })}
-                      placeholder="Histórico do astro no jogo..."
-                      className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
+                      className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400 font-mono"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800">
                   <button
                     type="button"
-                    onClick={() => setIsAddingNominee(false)}
-                    className="px-4 py-2 rounded-xl text-xs text-zinc-400 hover:text-white"
+                    onClick={() => {
+                      setIsAddingNominee(false);
+                      setEditingNomineeId(null);
+                    }}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-zinc-400 hover:text-white cursor-pointer"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl bg-gold-metallic-btn text-black font-bold text-xs uppercase"
+                    className="px-6 py-2.5 rounded-xl bg-gold-metallic-btn text-black font-black text-xs uppercase cursor-pointer shadow-lg shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all"
                   >
-                    Salvar Indicado
+                    {editingNomineeId ? 'Salvar Alterações' : 'Salvar Indicado no XMA'}
                   </button>
                 </div>
               </form>
@@ -860,7 +981,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div key={cat.id} className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-3">
                   <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-800">
                     <span className="font-bold text-amber-300 font-cinzel text-sm">
-                      {cat.title} ({cat.nominees.length} indicados)
+                      {cat.title} ({cat.nominees.length} {cat.nominees.length === 1 ? 'indicado' : 'indicados'})
                     </span>
                   </div>
 
@@ -874,21 +995,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <img
                             src={nominee.avatarUrl}
                             alt={nominee.name}
-                            className="w-10 h-10 rounded-xl object-cover border border-zinc-700"
+                            className="w-11 h-11 rounded-xl object-cover border border-zinc-700 bg-zinc-900 shrink-0"
                           />
                           <div>
                             <div className="font-bold text-white flex items-center gap-2">
-                              <span>{nominee.name}</span>
-                              <span className="text-[10px] font-mono text-zinc-400">{nominee.pkxdId}</span>
+                              <span className="text-sm">{nominee.name}</span>
+                              {nominee.handle && (
+                                <span className="text-[11px] font-medium text-amber-400">{nominee.handle}</span>
+                              )}
                               {cat.winnerNomineeId === nominee.id && (
                                 <span className="px-2 py-0.2 rounded text-[9px] bg-amber-400 text-black font-extrabold">
                                   Vencedor Oficial
                                 </span>
                               )}
                             </div>
-                            <div className="text-zinc-400 text-[11px] truncate max-w-xs sm:max-w-md">
-                              {nominee.projectTitle} • {nominee.handle}
-                            </div>
+                            {nominee.projectDescription && (
+                              <div className="text-zinc-400 text-[11px] truncate max-w-xs sm:max-w-md">
+                                {nominee.projectDescription}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -927,20 +1052,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               setEditingNomineeId(nominee.id);
                               setNomineeForm({
                                 name: nominee.name,
-                                handle: nominee.handle,
-                                avatarUrl: nominee.avatarUrl,
+                                handle: nominee.handle || '',
+                                avatarUrl: nominee.avatarUrl || '',
                                 categoryId: nominee.categoryId,
-                                projectTitle: nominee.projectTitle,
-                                projectDescription: nominee.projectDescription,
-                                projectType: nominee.projectType,
-                                pkxdId: nominee.pkxdId,
-                                bio: nominee.bio,
-                                badge: nominee.badge || '',
-                                votes: nominee.votes
+                                reason: nominee.projectDescription || nominee.bio || '',
+                                votes: nominee.votes || 0
                               });
                               setIsAddingNominee(true);
                             }}
-                            className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+                            className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 cursor-pointer"
                             title="Editar"
                           >
                             <Edit3 className="w-3.5 h-3.5" />

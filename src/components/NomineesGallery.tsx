@@ -294,10 +294,10 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#12131a] via-transparent to-black/40" />
 
-                        {/* Player PK XD ID Tag */}
+                        {/* Player PK XD ID Tag / Handle */}
                         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
                           <span className="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-black/75 border border-zinc-700 text-zinc-200 backdrop-blur-md">
-                            {nominee.pkxdId}
+                            {nominee.handle || nominee.pkxdId || 'Indicado'}
                           </span>
                           <span className="text-[11px] font-bold text-amber-300/90">
                             {category.status === 'voting_open' && totalCatVotes > 0
@@ -313,15 +313,16 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
                           <h3 className="text-lg font-bold text-white group-hover:text-amber-300 transition-colors font-cinzel">
                             {nominee.name}
                           </h3>
-                          <p className="text-xs text-amber-400 font-medium">
-                            {nominee.handle}
-                          </p>
-                          <p className="text-xs text-zinc-300 font-semibold line-clamp-1 pt-1">
-                            {nominee.projectTitle}
-                          </p>
-                          <p className="text-[11px] text-zinc-400 line-clamp-2">
-                            {nominee.projectDescription}
-                          </p>
+                          {nominee.handle && (
+                            <p className="text-xs text-amber-400 font-medium">
+                              {nominee.handle}
+                            </p>
+                          )}
+                          {nominee.projectDescription && nominee.projectDescription !== nominee.projectTitle && (
+                            <p className="text-[11px] text-zinc-400 line-clamp-2 pt-0.5">
+                              {nominee.projectDescription}
+                            </p>
+                          )}
                         </div>
 
                         {/* Progress / Status display */}

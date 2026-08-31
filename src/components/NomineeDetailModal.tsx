@@ -73,7 +73,9 @@ export const NomineeDetailModal: React.FC<NomineeDetailModalProps> = ({
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-cinzel">
                 {nominee.name}
               </h2>
-              <p className="text-amber-400/90 text-sm font-semibold">{nominee.handle}</p>
+              {nominee.handle && (
+                <p className="text-amber-400/90 text-sm font-semibold">{nominee.handle}</p>
+              )}
             </div>
           </div>
 
@@ -98,9 +100,11 @@ export const NomineeDetailModal: React.FC<NomineeDetailModalProps> = ({
 
               <div className="flex-1 text-center sm:text-left space-y-2">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <span className="px-3 py-1 rounded-lg text-xs font-mono font-bold bg-zinc-900 border border-zinc-700 text-zinc-300">
-                    ID PK XD: {nominee.pkxdId}
-                  </span>
+                  {nominee.pkxdId && nominee.pkxdId !== '#000' && !nominee.pkxdId.startsWith('#nom-') && (
+                    <span className="px-3 py-1 rounded-lg text-xs font-mono font-bold bg-zinc-900 border border-zinc-700 text-zinc-300">
+                      ID: {nominee.pkxdId}
+                    </span>
+                  )}
                   {nominee.badge && (
                     <span className="px-3 py-1 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500/30 to-amber-300/10 border border-amber-400 text-amber-300">
                       {nominee.badge}
@@ -114,25 +118,26 @@ export const NomineeDetailModal: React.FC<NomineeDetailModalProps> = ({
                   )}
                 </div>
 
-                <p className="text-zinc-300 text-sm leading-relaxed">
-                  {nominee.bio}
-                </p>
+                {nominee.bio && nominee.bio !== nominee.projectTitle && (
+                  <p className="text-zinc-300 text-sm leading-relaxed">
+                    {nominee.bio}
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* Project / Work Nominated */}
-            <div className="p-5 rounded-2xl bg-[#161722] border border-zinc-800 space-y-2">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
-                <Award className="w-4 h-4" />
-                <span>Trabalho / Projeto Indicado</span>
+            {/* Project / Work Nominated (if present and meaningful) */}
+            {nominee.projectDescription && (
+              <div className="p-5 rounded-2xl bg-[#161722] border border-zinc-800 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
+                  <Award className="w-4 h-4" />
+                  <span>Observação / Indicação</span>
+                </div>
+                <p className="text-zinc-300 text-sm">
+                  {nominee.projectDescription}
+                </p>
               </div>
-              <h3 className="text-lg font-bold text-white">
-                {nominee.projectTitle}
-              </h3>
-              <p className="text-zinc-400 text-sm">
-                {nominee.projectDescription}
-              </p>
-            </div>
+            )}
 
             {/* Real-Time Vote Bar in Modal */}
             <div className="p-5 rounded-2xl bg-gradient-to-br from-zinc-900 via-[#191924] to-zinc-900 border border-amber-500/20 space-y-3">

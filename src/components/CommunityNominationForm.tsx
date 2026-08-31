@@ -97,7 +97,7 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
     setValidationError(null);
 
     if (!formData.nomineeName.trim()) {
-      setValidationError('Por favor, informe o nome do criador ou astro indicado.');
+      setValidationError('Por favor, informe o nome do indicado.');
       return;
     }
 
@@ -106,25 +106,15 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
       return;
     }
 
-    // Validation: AT LEAST ONE SOCIAL NETWORK IS REQUIRED (Instagram, TikTok, or YouTube)
-    const hasInstagram = formData.instagram.trim().length > 0;
-    const hasTiktok = formData.tiktok.trim().length > 0;
-    const hasYoutube = formData.youtube.trim().length > 0;
-
-    if (!hasInstagram && !hasTiktok && !hasYoutube) {
-      setValidationError('É obrigatório informar ao menos uma rede social do indicado: Instagram, TikTok ou YouTube.');
-      return;
-    }
-
-    // Determine primary handle from provided socials
+    // Determine primary handle from provided socials or general handle
     let primaryHandle = '';
-    if (hasInstagram) {
+    if (formData.instagram.trim()) {
       const ig = formData.instagram.trim();
       primaryHandle = ig.startsWith('@') || ig.startsWith('http') ? ig : `@${ig}`;
-    } else if (hasTiktok) {
+    } else if (formData.tiktok.trim()) {
       const tt = formData.tiktok.trim();
       primaryHandle = tt.startsWith('@') || tt.startsWith('http') ? tt : `@${tt}`;
-    } else if (hasYoutube) {
+    } else if (formData.youtube.trim()) {
       const yt = formData.youtube.trim();
       primaryHandle = yt.startsWith('@') || yt.startsWith('http') ? yt : `@${yt}`;
     }
@@ -141,16 +131,16 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
       submittedByName: formData.submittedByName.trim(),
       submittedByPkxdId: submitterTag,
       nomineeName: formData.nomineeName.trim(),
-      nomineeHandle: primaryHandle,
+      nomineeHandle: primaryHandle || undefined,
       nomineePkxdId: nomineeTag,
       instagram: formData.instagram.trim() || undefined,
       tiktok: formData.tiktok.trim() || undefined,
       youtube: formData.youtube.trim() || undefined,
       categoryId: formData.categoryId,
       categoryTitle: selectedCategoryObj?.title || 'Categoria XMA',
-      workTitle: formData.workTitle.trim() || 'Trabalho Autoral PK XD',
+      workTitle: formData.workTitle.trim() || 'Indicado Oficial XMA 2026',
       workUrl: formData.workUrl.trim(),
-      reason: formData.reason.trim() || 'Destaque e talento no universo PK XD',
+      reason: formData.reason.trim() || 'Indicado ao Troféu XMA 2026',
       avatarUrl: formData.avatarUrl.trim() || undefined
     });
 
@@ -433,20 +423,20 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
                   </select>
                 </div>
 
-                {/* 3 Redes Sociais: Instagram, TikTok, YouTube (Pelo menos UMA obrigatória) */}
-                <div className="sm:col-span-2 p-4 rounded-2xl bg-zinc-900/80 border-2 border-amber-500/40 space-y-3">
+                {/* Redes Sociais: Instagram, TikTok, YouTube (Opcionais) */}
+                <div className="sm:col-span-2 p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                     <div className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Redes Sociais do Indicado (Obrigatório ao menos 1) *</span>
+                      <span>Redes Sociais do Indicado (@)</span>
                     </div>
-                    <span className="text-[10px] text-amber-400/90 font-medium">
-                      Pode preencher as três
+                    <span className="text-[10px] text-zinc-400 font-medium">
+                      Opcional
                     </span>
                   </div>
 
                   <p className="text-[11px] text-zinc-400">
-                    Informe onde o público e a comissão podem acompanhar os conteúdos do indicado:
+                    Se souber o @ ou canal do indicado, você pode preencher abaixo:
                   </p>
 
                   <div className="space-y-2.5 pt-1">
@@ -454,13 +444,13 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
                     <div>
                       <label className="block text-[11px] text-zinc-300 font-semibold mb-1 flex items-center gap-1.5">
                         <Instagram className="w-3.5 h-3.5 text-pink-400" />
-                        <span>Instagram</span>
+                        <span>Instagram (Opcional)</span>
                       </label>
                       <input
                         type="text"
                         value={formData.instagram}
                         onChange={(e) => setFormData({ ...formData, instagram: e.target.value })}
-                        placeholder="Ex: @nomedocriador ou https://instagram.com/..."
+                        placeholder="Ex: @nomedocriador"
                         className="w-full px-3.5 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 placeholder:text-zinc-600"
                       />
                     </div>
@@ -469,13 +459,13 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
                     <div>
                       <label className="block text-[11px] text-zinc-300 font-semibold mb-1 flex items-center gap-1.5">
                         <Video className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>TikTok</span>
+                        <span>TikTok (Opcional)</span>
                       </label>
                       <input
                         type="text"
                         value={formData.tiktok}
                         onChange={(e) => setFormData({ ...formData, tiktok: e.target.value })}
-                        placeholder="Ex: @nomedocriador ou https://tiktok.com/@..."
+                        placeholder="Ex: @nomedocriador"
                         className="w-full px-3.5 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 placeholder:text-zinc-600"
                       />
                     </div>
@@ -484,13 +474,13 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
                     <div>
                       <label className="block text-[11px] text-zinc-300 font-semibold mb-1 flex items-center gap-1.5">
                         <Youtube className="w-3.5 h-3.5 text-red-500" />
-                        <span>YouTube</span>
+                        <span>YouTube (Opcional)</span>
                       </label>
                       <input
                         type="text"
                         value={formData.youtube}
                         onChange={(e) => setFormData({ ...formData, youtube: e.target.value })}
-                        placeholder="Ex: @nomedocanal ou https://youtube.com/@..."
+                        placeholder="Ex: @nomedocanal"
                         className="w-full px-3.5 py-2 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 placeholder:text-zinc-600"
                       />
                     </div>
@@ -502,7 +492,7 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
                   <div className="flex items-center justify-between">
                     <label className="block text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
                       <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Foto do Indicado (Opcional - Enviar Foto Real ou Link)</span>
+                      <span>Foto do Indicado (Opcional - Escolha do Celular)</span>
                     </label>
                     {formData.avatarUrl && (
                       <button
@@ -517,14 +507,14 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
                   </div>
 
                   <p className="text-[11px] text-zinc-400">
-                    Você pode escolher uma foto do seu dispositivo ou colar o link de uma imagem do criador:
+                    Você pode escolher uma foto da sua galeria ou colar o link de uma imagem:
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     {/* File Upload */}
                     <div>
                       <label className="block text-[11px] text-zinc-300 font-semibold mb-1">
-                        1. Escolher Foto do Aparelho / PC
+                        1. Escolher Foto do Celular / Galeria
                       </label>
                       <input
                         type="file"
@@ -565,35 +555,15 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-zinc-400 mb-1 font-semibold">Título do Trabalho / Clipe / Produção (Opcional)</label>
-                  <input
-                    type="text"
-                    value={formData.workTitle}
-                    onChange={(e) => setFormData({ ...formData, workTitle: e.target.value })}
-                    placeholder="Ex: Série Mansão Mal-Assombrada / Clipe Oficial / Melhores Gameplays"
-                    className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-zinc-400 mb-1 font-semibold">Link do Vídeo / Conteúdo em Destaque (Opcional)</label>
-                  <input
-                    type="url"
-                    value={formData.workUrl}
-                    onChange={(e) => setFormData({ ...formData, workUrl: e.target.value })}
-                    placeholder="https://youtube.com/watch?v=... ou https://tiktok.com/..."
-                    className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-zinc-400 mb-1 font-semibold">Por que este criador merece concorrer ao Troféu XMA? *</label>
+                  <label className="block text-zinc-400 mb-1 font-semibold flex items-center justify-between">
+                    <span>Motivo da Indicação / Observação</span>
+                    <span className="text-[10px] text-zinc-500 font-normal">Não obrigatório</span>
+                  </label>
                   <textarea
-                    required
-                    rows={3}
+                    rows={2}
                     value={formData.reason}
                     onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                    placeholder="Conte para a comissão de jurados o impacto deste criador, o talento, carisma e porque ele merece concorrer..."
+                    placeholder="Conte por que esse criador merece concorrer ao Troféu XMA... (Opcional)"
                     className="w-full px-3.5 py-2.5 bg-black border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-amber-400 text-xs"
                   />
                 </div>
