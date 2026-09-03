@@ -27,6 +27,14 @@ import { PKXDLoginModal } from './components/PKXDLoginModal';
 import { CountdownTeaser } from './components/CountdownTeaser';
 import { triggerGoldenConfetti } from './utils/confetti';
 import { playVoteChime } from './utils/audio';
+import { setItemPersistent, getItemPersistent } from './utils/persistentStorage';
+import { 
+  testFirestoreConnection, 
+  saveAllCategoriesToFirestore, 
+  subscribeCategories, 
+  saveCommunityNominationToFirestore, 
+  subscribeCommunityNominations 
+} from './lib/firestoreService';
 
 export default function App() {
   // Navigation
@@ -156,41 +164,93 @@ export default function App() {
     category: Category;
   } | null>(null);
 
-  // Persistence Effects
+  // 1. Startup Recovery: Load from IndexedDB (recovering data if localStorage was limited or reset)
   useEffect(() => {
-    try {
-      localStorage.setItem('xma_categories_2026_v7', JSON.stringify(categories));
-    } catch {}
+    async function loadPersistentData() {
+      try {
+        const savedCats = await getItemPersistent<Category[]>('xma_categories_2026_v7', []);
+        if (Array.isArray(savedCats) && savedCats.length > 0) {
+          setCategories((current) => {
+            const currentNomineeCount = current.reduce((acc, c) => acc + (c.nominees?.length || 0), 0);
+            const savedNomineeCount = savedCats.reduce((acc, c) => acc + (c.nominees?.length || 0), 0);
+            if (savedNomineeCount >= currentNomineeCount) {
+              return savedCats.map((cat) => ({
+                ...cat,
+                nominees: sanitizeNominees(cat.nominees || [])
+              }));
+            }
+            return current;
+          });
+        }
+
+        const savedNoms = await getItemPersistent<CommunityNomination[]>('xma_community_nominations_2026_v7', []);
+        if (Array.isArray(savedNoms) && savedNoms.length > 0) {
+          setCommunityNominations((current) => {
+            if (savedNoms.length >= current.length) {
+              return savedNoms;
+            }
+            return current;
+          });
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar dados persistentes:', e);
+      }
+    }
+    loadPersistentData();
+  }, []);
+
+  // 2. Real-time Cloud Sync with Firestore
+  useEffect(() => {
+    testFirestoreConnection();
+
+    const unsubCategories = subscribeCategories((cloudCategories) => {
+      if (Array.isArray(cloudCategories) && cloudCategories.length > 0) {
+        const sanitized = cloudCategories.map((c) => ({
+          ...c,
+          nominees: sanitizeNominees(c.nominees || [])
+        }));
+        setCategories(sanitized);
+        setItemPersistent('xma_categories_2026_v7', sanitized);
+      }
+    });
+
+    const unsubNominations = subscribeCommunityNominations((cloudNominations) => {
+      if (Array.isArray(cloudNominations) && cloudNominations.length > 0) {
+        setCommunityNominations(cloudNominations);
+        setItemPersistent('xma_community_nominations_2026_v7', cloudNominations);
+      }
+    });
+
+    return () => {
+      unsubCategories();
+      unsubNominations();
+    };
+  }, []);
+
+  // 3. Persistence Effects (Dual-layer IndexedDB + localStorage + Firestore)
+  useEffect(() => {
+    setItemPersistent('xma_categories_2026_v7', categories);
+    saveAllCategoriesToFirestore(categories);
   }, [categories]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('xma_settings_2026_v7', JSON.stringify(settings));
-    } catch {}
+    setItemPersistent('xma_settings_2026_v7', settings);
   }, [settings]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('xma_chat_2026_v7', JSON.stringify(chatMessages));
-    } catch {}
+    setItemPersistent('xma_chat_2026_v7', chatMessages);
   }, [chatMessages]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('xma_community_nominations_2026_v7', JSON.stringify(communityNominations));
-    } catch {}
+    setItemPersistent('xma_community_nominations_2026_v7', communityNominations);
   }, [communityNominations]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('xma_user_account_2026_v7', JSON.stringify(userAccount));
-    } catch {}
+    setItemPersistent('xma_user_account_2026_v7', userAccount);
   }, [userAccount]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('xma_user_votes_2026_v7', JSON.stringify(userVotes));
-    } catch {}
+    setItemPersistent('xma_user_votes_2026_v7', userVotes);
   }, [userVotes]);
 
   useEffect(() => {
@@ -296,13 +356,19 @@ export default function App() {
     };
 
     setCommunityNominations((prev) => [submission, ...prev]);
+    saveCommunityNominationToFirestore(submission);
   };
 
   // Community Nomination Like
   const handleLikeNomination = (nomId: string) => {
-    setCommunityNominations((prev) =>
-      prev.map((n) => (n.id === nomId ? { ...n, communityLikes: n.communityLikes + 1 } : n))
-    );
+    setCommunityNominations((prev) => {
+      const updated = prev.map((n) => (n.id === nomId ? { ...n, communityLikes: n.communityLikes + 1 } : n));
+      const target = updated.find((n) => n.id === nomId);
+      if (target) {
+        saveCommunityNominationToFirestore(target);
+      }
+      return updated;
+    });
     playVoteChime();
   };
 
@@ -422,6 +488,7 @@ export default function App() {
         userAccount={userAccount}
         onOpenLoginModal={() => setIsLoginModalOpen(true)}
         onShowCountdown={() => setIsCountdownActive(true)}
+        communityNominationsOpen={settings.communityNominationsOpen ?? false}
       />
 
       {/* Main Container */}

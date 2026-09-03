@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Vote, Award, Shield, UserPlus, Sparkles, User, LogIn, CheckCircle2, Timer, Crown } from 'lucide-react';
+import { Trophy, Vote, Award, Shield, UserPlus, Sparkles, User, LogIn, CheckCircle2, Timer, Crown, Lock } from 'lucide-react';
 import { PKXDUserAccount, isAuthorizedAdminEmail } from '../types';
 
 interface NavbarProps {
@@ -8,6 +8,7 @@ interface NavbarProps {
   userAccount: PKXDUserAccount;
   onOpenLoginModal: () => void;
   onShowCountdown?: () => void;
+  communityNominationsOpen?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -15,7 +16,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectTab,
   userAccount,
   onOpenLoginModal,
-  onShowCountdown
+  onShowCountdown,
+  communityNominationsOpen = false
 }) => {
   const isAdmin = isAuthorizedAdminEmail(userAccount.email);
   return (
@@ -85,8 +87,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
-              <UserPlus className="w-4 h-4" />
-              <span>Indicar Astro</span>
+              {communityNominationsOpen ? (
+                <>
+                  <UserPlus className="w-4 h-4" />
+                  <span>Indicar Astro</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-3.5 h-3.5 text-red-400/90" />
+                  <span>Indicações (Encerradas)</span>
+                </>
+              )}
             </button>
 
             <button
@@ -200,8 +211,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               activeTab === 'community_nominations' ? 'text-amber-400' : 'text-zinc-400'
             }`}
           >
-            <UserPlus className="w-4 h-4" />
-            <span>Indicar</span>
+            {communityNominationsOpen ? (
+              <>
+                <UserPlus className="w-4 h-4" />
+                <span>Indicar</span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-4 h-4 text-red-400/90" />
+                <span className="text-[10px]">Encerrado</span>
+              </>
+            )}
           </button>
 
           <button

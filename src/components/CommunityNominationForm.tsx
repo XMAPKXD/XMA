@@ -23,6 +23,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { triggerGoldenConfetti } from '../utils/confetti';
 import { playVoteChime } from '../utils/audio';
+import { compressImage } from '../utils/imageCompressor';
 
 interface CommunityNominationFormProps {
   categories: Category[];
@@ -66,23 +67,29 @@ export const CommunityNominationForm: React.FC<CommunityNominationFormProps> = (
 
   const selectedCategoryObj = categories.find((c) => c.id === formData.categoryId);
 
-  // Handle local image file upload
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle local image file upload with compression
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState<boolean>(false);
+
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 3 * 1024 * 1024) {
-      alert('A imagem é muito grande. Escolha uma foto de até 3MB.');
-      return;
+    try {
+      setIsCompressingPhoto(true);
+      const compressedDataUrl = await compressImage(file, 800, 800, 0.78);
+      setFormData((prev) => ({ ...prev, avatarUrl: compressedDataUrl }));
+    } catch (err) {
+      console.error('Erro ao otimizar foto da indicação:', err);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setFormData((prev) => ({ ...prev, avatarUrl: String(event.target?.result) }));
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressingPhoto(false);
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setFormData((prev) => ({ ...prev, avatarUrl: String(event.target?.result) }));
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleRemovePhoto = () => {

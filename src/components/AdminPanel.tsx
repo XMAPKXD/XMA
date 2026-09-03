@@ -50,6 +50,7 @@ import { extractYouTubeId, getYouTubeEmbedUrl, isMusicCategory, isThumbnailCateg
 import { triggerWinnerTrophyBlast, triggerGoldenConfetti } from '../utils/confetti';
 import { playFanfare, playAdminGavel, playVoteChime } from '../utils/audio';
 import { signInWithGoogle } from '../lib/firebase';
+import { compressImage, compressDataUrl } from '../utils/imageCompressor';
 import { AdminVotingStats } from './AdminVotingStats';
 
 interface AdminPanelProps {
@@ -128,22 +129,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   });
 
   // Handle local image file upload from mobile or desktop (Nominee Avatar)
-  const handleNomineePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState<boolean>(false);
+
+  const handleNomineePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('A foto é muito grande. Escolha uma imagem de até 5MB.');
-      return;
+    try {
+      setIsCompressingPhoto(true);
+      // Automatically compress and resize to max 800x800, converting 10MB mobile photo to ~40KB
+      const compressedDataUrl = await compressImage(file, 800, 800, 0.78);
+      setNomineeForm((prev) => ({ ...prev, avatarUrl: compressedDataUrl }));
+    } catch (err) {
+      console.error('Erro ao otimizar foto:', err);
+      // Fallback
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setNomineeForm((prev) => ({ ...prev, avatarUrl: String(event.target?.result) }));
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressingPhoto(false);
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setNomineeForm((prev) => ({ ...prev, avatarUrl: String(event.target?.result) }));
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleRemoveNomineePhoto = () => {
@@ -154,22 +163,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // Handle local thumbnail image upload (Thumbnail of the Year)
-  const handleThumbnailPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleThumbnailPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('A imagem é muito grande. Escolha uma imagem de até 5MB.');
-      return;
+    try {
+      setIsCompressingPhoto(true);
+      // Automatically compress to 16:9 format (960x540 max) ~50KB
+      const compressedDataUrl = await compressImage(file, 960, 540, 0.80);
+      setNomineeForm((prev) => ({ ...prev, thumbnailUrl: compressedDataUrl }));
+    } catch (err) {
+      console.error('Erro ao otimizar thumbnail:', err);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setNomineeForm((prev) => ({ ...prev, thumbnailUrl: String(event.target?.result) }));
+        }
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressingPhoto(false);
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setNomineeForm((prev) => ({ ...prev, thumbnailUrl: String(event.target?.result) }));
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleRemoveThumbnailPhoto = () => {

@@ -51,6 +51,7 @@ import {
 } from '../utils/audio';
 import { triggerGoldenConfetti } from '../utils/confetti';
 import { signInWithGoogle } from '../lib/firebase';
+import { compressImage } from '../utils/imageCompressor';
 
 interface CountdownTeaserProps {
   onReveal: () => void;
@@ -145,6 +146,26 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
   const [showSuccessBadge, setShowSuccessBadge] = useState(false);
   const [nominationValidationError, setNominationValidationError] = useState<string | null>(null);
   const countdownFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
+
+  const handleNominationPhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsCompressingPhoto(true);
+      const compressed = await compressImage(file, 600, 600, 0.78);
+      setNomineeAvatarUrl(compressed);
+    } catch (err) {
+      console.error('Erro ao comprimir imagem:', err);
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (ev.target?.result) setNomineeAvatarUrl(String(ev.target.result));
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressingPhoto(false);
+    }
+  };
 
   const handleNominationSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -894,8 +915,8 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                     : 'text-zinc-400 hover:text-amber-200 hover:bg-zinc-900/60'
                 }`}
               >
-                <UserPlus className="w-4 h-4" />
-                <span>Sugerir Indicado</span>
+                <Lock className="w-4 h-4 text-red-400" />
+                <span>Indicações Encerradas</span>
               </button>
             </div>
 
@@ -1240,7 +1261,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                   </h3>
 
                   <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed max-w-lg mx-auto">
-                    O período de envio de sugestões da comunidade foi finalizado com sucesso. O comitê organizador oficial do <strong className="text-amber-300">XMA 2026</strong> já consolidou os indicados de cada categoria!
+                    O período de envio de sugestões e indicações da comunidade foi finalizado com sucesso. O comitê organizador oficial do <strong className="text-amber-300">XMA 2026</strong> já consolidou os indicados de cada categoria!
                   </p>
                 </div>
 
@@ -1317,6 +1338,44 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                     <ArrowRight className="w-4 h-4 text-black" />
                   </button>
                 </div>
+
+                {/* Archived Community Nominations Preview (Read-only) */}
+                {communityNominations && communityNominations.length > 0 && (
+                  <div className="mt-8 pt-6 border-t border-zinc-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-amber-400" />
+                        <h4 className="text-sm font-bold text-white font-cinzel">
+                          Sugestões da Comunidade Recebidas
+                        </h4>
+                      </div>
+                      <span className="text-[11px] font-mono text-zinc-400">
+                        {communityNominations.length} arquivadas
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
+                      {communityNominations.map((nom) => (
+                        <div
+                          key={nom.id}
+                          className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 flex items-center gap-3 text-xs"
+                        >
+                          <div className="w-9 h-9 rounded-lg bg-amber-400/10 border border-amber-400/30 overflow-hidden shrink-0 flex items-center justify-center">
+                            {nom.avatarUrl ? (
+                              <img src={nom.avatarUrl} alt={nom.nomineeName} className="w-full h-full object-cover" />
+                            ) : (
+                              <Trophy className="w-4 h-4 text-amber-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-white truncate">{nom.nomineeName}</div>
+                            <div className="text-[10px] text-amber-300 truncate">{nom.categoryTitle}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>
