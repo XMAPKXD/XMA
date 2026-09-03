@@ -44,7 +44,9 @@ import {
   Camera,
   X,
   Music,
-  Play
+  Play,
+  Layers,
+  FileSpreadsheet
 } from 'lucide-react';
 import { extractYouTubeId, getYouTubeEmbedUrl, isMusicCategory, isThumbnailCategory } from '../utils/media';
 import { triggerWinnerTrophyBlast, triggerGoldenConfetti } from '../utils/confetti';
@@ -52,6 +54,7 @@ import { playFanfare, playAdminGavel, playVoteChime } from '../utils/audio';
 import { signInWithGoogle } from '../lib/firebase';
 import { compressImage, compressDataUrl } from '../utils/imageCompressor';
 import { AdminVotingStats } from './AdminVotingStats';
+import { BulkNomineeImporter } from './BulkNomineeImporter';
 
 interface AdminPanelProps {
   categories: Category[];
@@ -102,6 +105,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   
   // Nominee form state
   const [isAddingNominee, setIsAddingNominee] = useState<boolean>(false);
+  const [isBulkImporterOpen, setIsBulkImporterOpen] = useState<boolean>(false);
+  const [bulkSuccessMessage, setBulkSuccessMessage] = useState<string | null>(null);
   const [editingNomineeId, setEditingNomineeId] = useState<string | null>(null);
   const nomineeFileInputRef = useRef<HTMLInputElement | null>(null);
   const thumbnailFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -516,6 +521,67 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     onUpdateCommunityNominations(updated);
   };
 
+  // Bulk Approve All Pending Community Nominations
+  const handleBulkApproveCommunityNominations = () => {
+    const pending = communityNominations.filter((n) => n.status !== 'approved' && n.status !== 'rejected');
+    if (pending.length === 0) {
+      alert('Não há indicações pendentes da comunidade para aprovar.');
+      return;
+    }
+
+    if (!confirm(`Deseja aprovar todas as ${pending.length} indicações da comunidade e adicioná-las aos indicados oficiais das categorias?`)) {
+      return;
+    }
+
+    const updatedCategories = categories.map((cat) => {
+      const matchingItems = pending.filter((n) => {
+        const catMatch = categories.some((c) => c.id === n.categoryId) ? n.categoryId : categories[0]?.id;
+        return catMatch === cat.id;
+      });
+
+      if (matchingItems.length === 0) return cat;
+
+      const newNominees: Nominee[] = matchingItems.map((nom, idx) => ({
+        id: `nom-bulk-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+        name: nom.nomineeName,
+        handle: nom.nomineeHandle || (nom.instagram ? `@${nom.instagram.replace('@', '')}` : nom.tiktok ? `@${nom.tiktok.replace('@', '')}` : '@pkxd_creator'),
+        avatarUrl: nom.avatarUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80',
+        categoryId: cat.id,
+        projectTitle: nom.workTitle || 'Trabalho Aprovado pela Comunidade',
+        projectDescription: nom.reason || 'Indicado oficial sugerido pelos fãs.',
+        projectType: 'media_creator',
+        votes: 0,
+        verifiedVotes: 0,
+        massVotes: 0,
+        pkxdId: nom.nomineePkxdId || '#Admin000',
+        bio: nom.reason,
+        badge: 'Voz da Comunidade'
+      }));
+
+      return {
+        ...cat,
+        nominees: [...cat.nominees, ...newNominees]
+      };
+    });
+
+    onUpdateCategories(updatedCategories);
+
+    const updatedCommunity = communityNominations.map((n) => {
+      if (pending.some((p) => p.id === n.id)) {
+        return { ...n, status: 'approved' as const };
+      }
+      return n;
+    });
+    onUpdateCommunityNominations(updatedCommunity);
+
+    playFanfare();
+    playAdminGavel();
+    triggerWinnerTrophyBlast();
+    triggerGoldenConfetti();
+    setBulkSuccessMessage(`🎉 ${pending.length} sugestões da comunidade foram aprovadas e oficializadas com sucesso no XMA 2026!`);
+    setTimeout(() => setBulkSuccessMessage(null), 7000);
+  };
+
   // Toggle Category Status (open, closed, winner_revealed)
   const handleSetCategoryStatus = (categoryId: string, status: Category['status']) => {
     const updated = categories.map((cat) => {
@@ -791,6 +857,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* 1. NOMINEES CRUD MANAGER */}
       {activeSubTab === 'nominees' && (
         <div className="space-y-6">
+          {/* Bulk Nominee Importer Modal */}
+          <BulkNomineeImporter
+            categories={categories}
+            isOpen={isBulkImporterOpen}
+            onClose={() => setIsBulkImporterOpen(false)}
+            onImportSuccess={(count, updatedCats) => {
+              onUpdateCategories(updatedCats);
+              setBulkSuccessMessage(`🎉 Sucesso! ${count} indicados foram adicionados em massa e sincronizados com sucesso no XMA 2026.`);
+              setTimeout(() => setBulkSuccessMessage(null), 8000);
+            }}
+          />
+
           <div className="p-6 rounded-3xl bg-[#14151e] border border-amber-500/30 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-800">
               <div>
@@ -802,15 +880,69 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </p>
               </div>
 
+              <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setIsBulkImporterOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-300 border-2 border-amber-400/60 font-black text-xs uppercase flex items-center gap-2 cursor-pointer shadow-lg shadow-amber-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  title="Importar múltiplos indicados de uma vez via planilha ou texto"
+                >
+                  <Layers className="w-4 h-4 text-amber-400" />
+                  <span>⚡ Envio em Massa (Lote)</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setEditingNomineeId(null);
+                    setIsAddingNominee(!isAddingNominee);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-gold-metallic-btn text-black font-bold text-xs uppercase flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isAddingNominee ? 'Fechar Formulário' : 'Novo Indicado'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Bulk Success Notification Banner */}
+            {bulkSuccessMessage && (
+              <div className="p-4 rounded-2xl bg-emerald-950/40 border-2 border-emerald-500/60 text-emerald-200 text-xs sm:text-sm font-bold flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span>{bulkSuccessMessage}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBulkSuccessMessage(null)}
+                  className="p-1 rounded-lg hover:bg-emerald-900/40 text-emerald-300 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Quick Bulk Import Info Helper */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/30 via-[#10111a] to-amber-950/30 border border-amber-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 text-xs">
+                <div className="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
+                  <FileSpreadsheet className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <div className="font-extrabold text-amber-200">
+                    Precisa cadastrar muitos indicados de uma vez só?
+                  </div>
+                  <div className="text-zinc-400 text-[11px]">
+                    Use o <strong>Envio em Massa</strong> para colar dezenas de nomes do Excel/Google Sheets ou subir um arquivo CSV em poucos segundos.
+                  </div>
+                </div>
+              </div>
+
               <button
-                onClick={() => {
-                  setEditingNomineeId(null);
-                  setIsAddingNominee(!isAddingNominee);
-                }}
-                className="px-4 py-2 rounded-xl bg-gold-metallic-btn text-black font-bold text-xs uppercase flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                type="button"
+                onClick={() => setIsBulkImporterOpen(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-bold text-xs border border-amber-500/40 self-start sm:self-auto transition-all cursor-pointer whitespace-nowrap"
               >
-                <Plus className="w-4 h-4" />
-                <span>{isAddingNominee ? 'Fechar Formulário' : 'Novo Indicado'}</span>
+                Abrir Envio em Massa
               </button>
             </div>
 
@@ -1459,10 +1591,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </p>
               </div>
 
-              <span className="text-xs px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold">
-                {communityNominations.length} sugestões no total
-              </span>
+              <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto">
+                {communityNominations.filter(n => n.status !== 'approved' && n.status !== 'rejected').length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleBulkApproveCommunityNominations}
+                    className="px-4 py-2 rounded-xl bg-gold-metallic-btn text-black font-extrabold text-xs uppercase flex items-center gap-2 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    title="Aprovar todas as sugestões pendentes da comunidade e adicioná-las aos indicados oficiais"
+                  >
+                    <Award className="w-4 h-4" />
+                    <span>⚡ Aprovar Todas em Massa ({communityNominations.filter(n => n.status !== 'approved' && n.status !== 'rejected').length})</span>
+                  </button>
+                )}
+
+                <span className="text-xs px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold">
+                  {communityNominations.length} sugestões no total
+                </span>
+              </div>
             </div>
+
+            {/* Bulk Success Notification Banner */}
+            {bulkSuccessMessage && (
+              <div className="p-4 rounded-2xl bg-emerald-950/40 border-2 border-emerald-500/60 text-emerald-200 text-xs sm:text-sm font-bold flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span>{bulkSuccessMessage}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBulkSuccessMessage(null)}
+                  className="p-1 rounded-lg hover:bg-emerald-900/40 text-emerald-300 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
 
             {communityNominations.length === 0 ? (
               <div className="p-8 text-center text-zinc-500 text-xs">
