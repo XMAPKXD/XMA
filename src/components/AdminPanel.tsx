@@ -108,14 +108,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     avatarUrl: string;
     categoryId: string;
     reason: string;
-    votes: number;
   }>({
     name: '',
     handle: '',
     avatarUrl: '',
     categoryId: categories[0]?.id || '',
-    reason: '',
-    votes: 0
+    reason: ''
   });
 
   // Handle local image file upload from mobile or desktop
@@ -229,10 +227,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       : '';
 
     const cleanAvatar = nomineeForm.avatarUrl.trim() || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80';
-    const totalVotes = Number(nomineeForm.votes) || 0;
 
     if (editingNomineeId) {
-      // Edit existing
+      // Edit existing (preserve real votes)
       const updated = categories.map((cat) => {
         return {
           ...cat,
@@ -247,10 +244,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 projectTitle: nomineeForm.reason.trim() || 'Indicado Oficial XMA 2026',
                 projectDescription: nomineeForm.reason.trim() || '',
                 bio: nomineeForm.reason.trim() || '',
-                pkxdId: cleanHandle || `#${nomineeForm.name.replace(/\s+/g, '').slice(0, 8)}`,
-                votes: totalVotes,
-                verifiedVotes: Math.round(totalVotes * 0.75),
-                massVotes: Math.round(totalVotes * 0.25)
+                pkxdId: cleanHandle || `#${nomineeForm.name.replace(/\s+/g, '').slice(0, 8)}`
               };
             }
             return n;
@@ -260,7 +254,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       onUpdateCategories(updated);
       setEditingNomineeId(null);
     } else {
-      // Create new
+      // Create new (starts with 0 votes)
       const newNominee: Nominee = {
         id: `nom-${Date.now()}`,
         name: nomineeForm.name.trim(),
@@ -272,9 +266,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         projectType: 'media_creator',
         pkxdId: cleanHandle || `#${nomineeForm.name.replace(/\s+/g, '').slice(0, 8)}`,
         bio: nomineeForm.reason.trim() || '',
-        votes: totalVotes,
-        verifiedVotes: Math.round(totalVotes * 0.75),
-        massVotes: Math.round(totalVotes * 0.25)
+        votes: 0,
+        verifiedVotes: 0,
+        massVotes: 0
       };
       const updated = categories.map((cat) => {
         if (cat.id === nomineeForm.categoryId) {
@@ -295,8 +289,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       handle: '',
       avatarUrl: '',
       categoryId: categories[0]?.id || '',
-      reason: '',
-      votes: 0
+      reason: ''
     });
     if (nomineeFileInputRef.current) {
       nomineeFileInputRef.current.value = '';
@@ -452,25 +445,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return n;
     });
     onUpdateCommunityNominations(updated);
-  };
-
-  // Adjust Nominee Votes
-  const handleAdjustVotes = (categoryId: string, nomineeId: string, delta: number) => {
-    const updated = categories.map((cat) => {
-      if (cat.id === categoryId) {
-        return {
-          ...cat,
-          nominees: cat.nominees.map((n) => {
-            if (n.id === nomineeId) {
-              return { ...n, votes: Math.max(0, n.votes + delta) };
-            }
-            return n;
-          })
-        };
-      }
-      return cat;
-    });
-    onUpdateCategories(updated);
   };
 
   // Toggle Category Status (open, closed, winner_revealed)
@@ -755,7 +729,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   Gerenciador de Indicados Oficiais
                 </h2>
                 <p className="text-xs text-zinc-400">
-                  Adicione novos criadores, edite informações ou ajuste o total de votos em tempo real.
+                  Adicione novos criadores, edite informações e gerencie os concorrentes oficiais do XMA.
                 </p>
               </div>
 
@@ -938,20 +912,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       className="w-full px-3.5 py-2.5 bg-black/80 border border-zinc-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400"
                     />
                   </div>
-
-                  {/* 6. Votos Iniciais (Opcional) */}
-                  <div>
-                    <label className="block text-zinc-400 mb-1 font-semibold text-xs flex items-center justify-between">
-                      <span>Votos Iniciais</span>
-                      <span className="text-[10px] text-zinc-500">Padrão 0</span>
-                    </label>
-                    <input
-                      type="number"
-                      value={nomineeForm.votes}
-                      onChange={(e) => setNomineeForm({ ...nomineeForm, votes: parseInt(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400 font-mono"
-                    />
-                  </div>
                 </div>
 
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800">
@@ -1018,30 +978,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
 
                         <div className="flex items-center gap-3 self-end sm:self-auto">
-                          {/* Vote Adjusters */}
-                          <div className="flex items-center gap-1 bg-zinc-900 px-2 py-1 rounded-lg border border-zinc-700">
-                            <span className="font-mono font-bold text-amber-300 pr-1">
+                          {/* Read-Only Real Vote Count */}
+                          <div className="flex items-center gap-1.5 bg-zinc-900/90 px-3 py-1.5 rounded-xl border border-zinc-800" title="Votos auditados recebidos pelo público">
+                            <span className="text-[10px] text-zinc-500 font-medium">Votos:</span>
+                            <span className="font-mono font-bold text-amber-300">
                               {nominee.votes.toLocaleString('pt-BR')}
                             </span>
-                            <button
-                              onClick={() => handleAdjustVotes(cat.id, nominee.id, 100)}
-                              className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-bold"
-                            >
-                              +100
-                            </button>
-                            <button
-                              onClick={() => handleAdjustVotes(cat.id, nominee.id, 500)}
-                              className="px-1.5 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 text-[10px] font-bold"
-                            >
-                              +500
-                            </button>
                           </div>
 
                           {/* Set Winner */}
                           <button
                             onClick={() => handleSetWinnerManually(cat.id, nominee.id)}
-                            className="p-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/40 text-amber-300 border border-amber-400/40"
-                            title="Declarar Vencedor"
+                            className="p-1.5 rounded-lg bg-amber-400/20 hover:bg-amber-400/40 text-amber-300 border border-amber-400/40 cursor-pointer"
+                            title="Declarar Vencedor Oficial"
                           >
                             <Crown className="w-3.5 h-3.5" />
                           </button>
@@ -1055,8 +1004,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 handle: nominee.handle || '',
                                 avatarUrl: nominee.avatarUrl || '',
                                 categoryId: nominee.categoryId,
-                                reason: nominee.projectDescription || nominee.bio || '',
-                                votes: nominee.votes || 0
+                                reason: nominee.projectDescription || nominee.bio || ''
                               });
                               setIsAddingNominee(true);
                             }}
@@ -1069,7 +1017,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           {/* Delete */}
                           <button
                             onClick={() => handleDeleteNominee(cat.id, nominee.id)}
-                            className="p-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-800"
+                            className="p-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-800 cursor-pointer"
                             title="Excluir"
                           >
                             <Trash2 className="w-3.5 h-3.5" />

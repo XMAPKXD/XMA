@@ -9,14 +9,10 @@ import {
   Search, 
   RotateCcw, 
   Flame, 
-  Zap, 
   Users, 
   AlertTriangle, 
   Sliders, 
   Download, 
-  Plus, 
-  Minus, 
-  Trash2, 
   Info,
   CheckCircle2,
   Crown,
@@ -25,8 +21,8 @@ import {
   Sparkles,
   BarChart3
 } from 'lucide-react';
-import { playVoteChime, playFanfare, playAdminGavel } from '../utils/audio';
-import { triggerGoldenConfetti, triggerWinnerTrophyBlast } from '../utils/confetti';
+import { playFanfare, playAdminGavel } from '../utils/audio';
+import { triggerGoldenConfetti } from '../utils/confetti';
 
 interface AdminVotingStatsProps {
   categories: Category[];
@@ -250,35 +246,6 @@ export const AdminVotingStats: React.FC<AdminVotingStatsProps> = ({
     return result;
   }, [processedNominees, selectedCategoryId, riskFilter, searchQuery, sortBy, sortOrder]);
 
-  // Adjust votes handler
-  const handleModifyVotes = (categoryId: string, nomineeId: string, type: 'unique' | 'mass', delta: number) => {
-    const updated = categories.map((cat) => {
-      if (cat.id === categoryId) {
-        return {
-          ...cat,
-          nominees: cat.nominees.map((n) => {
-            if (n.id === nomineeId) {
-              const u = n.verifiedVotes || 0;
-              const m = n.massVotes !== undefined ? n.massVotes : Math.max(0, n.votes - u);
-              const newU = type === 'unique' ? Math.max(0, u + delta) : u;
-              const newM = type === 'mass' ? Math.max(0, m + delta) : m;
-              return {
-                ...n,
-                verifiedVotes: newU,
-                massVotes: newM,
-                votes: newU + newM
-              };
-            }
-            return n;
-          })
-        };
-      }
-      return cat;
-    });
-    onUpdateCategories(updated);
-    playVoteChime();
-  };
-
   // Sanitize / Purge suspicious bot clicks from a nominee
   const handlePurgeSuspiciousClicks = (categoryId: string, nomineeId: string, nomineeName: string) => {
     if (!confirm(`Deseja aplicar a sanitização anti-bot em "${nomineeName}"? Isso reduzirá 75% dos votos em massa suspeitos preservando 100% dos votos únicos legítimos.`)) {
@@ -312,34 +279,6 @@ export const AdminVotingStats: React.FC<AdminVotingStatsProps> = ({
     playAdminGavel();
     triggerGoldenConfetti();
     alert(`✅ Sanitização aplicada em "${nomineeName}". O ranking agora reflete com precisão os votos ponderados.`);
-  };
-
-  // Simulate a live vote spike (to test detection system)
-  const handleSimulateSpike = () => {
-    if (categories.length === 0 || categories[0].nominees.length === 0) return;
-    const cat = categories[0];
-    const targetNom = cat.nominees[0];
-    const spikeAmount = 250;
-
-    const newSpike: SuspiciousVoteSpike = {
-      id: `spike-${Date.now()}`,
-      nomineeId: targetNom.id,
-      nomineeName: targetNom.name,
-      categoryId: cat.id,
-      categoryTitle: cat.title,
-      timestamp: 'Agora há instantes',
-      spikeType: 'bot_burst',
-      votesCount: spikeAmount,
-      uniqueCount: 2,
-      massCount: spikeAmount - 2,
-      severity: 'high',
-      description: `Surto simulado: +${spikeAmount} cliques em massa gerados em menos de 10 segundos.`
-    };
-
-    setSimulatedSpikes((prev) => [newSpike, ...prev.slice(0, 15)]);
-    handleModifyVotes(cat.id, targetNom.id, 'mass', spikeAmount);
-    playAdminGavel();
-    alert(`🚨 Pico simulado adicionado a "${targetNom.name}". Observe o badge de risco na tabela.`);
   };
 
   // Export audit report
@@ -396,15 +335,6 @@ export const AdminVotingStats: React.FC<AdminVotingStatsProps> = ({
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={handleSimulateSpike}
-              className="px-3.5 py-2 rounded-xl bg-purple-950/70 hover:bg-purple-900 border border-purple-500/50 text-purple-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md"
-              title="Injeta uma rajada de votos para testar o detector de picos suspeitos"
-            >
-              <Zap className="w-3.5 h-3.5 text-purple-400" />
-              <span>Simular Pico</span>
-            </button>
-
             <button
               onClick={handleExportReport}
               className="px-4 py-2 rounded-xl bg-gold-metallic-btn text-black font-extrabold text-xs uppercase flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-amber-500/20"
@@ -779,33 +709,21 @@ export const AdminVotingStats: React.FC<AdminVotingStatsProps> = ({
                           {/* Actions */}
                           <td className="py-3.5 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              {item.riskLevel === 'high' && (
+                              {item.riskLevel === 'high' ? (
                                 <button
                                   onClick={() => handlePurgeSuspiciousClicks(item.category.id, item.nominee.id, item.nominee.name)}
-                                  className="px-2.5 py-1 rounded-lg bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-200 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-sm"
-                                  title="Expurgar 75% dos cliques em massa suspeitos"
+                                  className="px-3 py-1.5 rounded-lg bg-rose-950 hover:bg-rose-900 border border-rose-500 text-rose-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                                  title="Expurgar 75% dos cliques em massa suspeitos preservando votos únicos"
                                 >
-                                  <ShieldAlert className="w-3 h-3 text-rose-400" />
+                                  <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
                                   <span>Purgar Bots</span>
                                 </button>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500">
+                                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400/70" />
+                                  <span>Auditado</span>
+                                </span>
                               )}
-
-                              <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-700">
-                                <button
-                                  onClick={() => handleModifyVotes(item.category.id, item.nominee.id, 'unique', 10)}
-                                  className="px-2 py-0.5 rounded-lg bg-emerald-950 text-emerald-300 hover:bg-emerald-900 text-[10px] font-bold"
-                                  title="+10 Votos Únicos (75% peso)"
-                                >
-                                  +10 Únicos
-                                </button>
-                                <button
-                                  onClick={() => handleModifyVotes(item.category.id, item.nominee.id, 'mass', 50)}
-                                  className="px-2 py-0.5 rounded-lg bg-blue-950 text-blue-300 hover:bg-blue-900 text-[10px] font-bold"
-                                  title="+50 Votos em Massa (25% peso)"
-                                >
-                                  +50 Massa
-                                </button>
-                              </div>
                             </div>
                           </td>
                         </tr>
@@ -843,7 +761,7 @@ export const AdminVotingStats: React.FC<AdminVotingStatsProps> = ({
           <div className="space-y-3">
             {simulatedSpikes.length === 0 ? (
               <div className="p-8 text-center text-zinc-500 text-xs">
-                Nenhum pico recente registrado. Use o botão "Simular Pico" para testar o sistema.
+                Nenhum pico ou anomalia de votos registrado recentemente no sistema.
               </div>
             ) : (
               simulatedSpikes.map((spike) => (
