@@ -17,6 +17,8 @@ export interface Nominee {
   bio: string;
   accentColor?: string;
   badge?: string;
+  youtubeUrl?: string;
+  thumbnailUrl?: string;
 }
 
 export interface SuspiciousVoteSpike {

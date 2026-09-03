@@ -14,7 +14,7 @@ export const INITIAL_CATEGORIES: Category[] = [
   },
   {
     id: 'cat-hit-musical',
-    title: 'Melhor Hit Musical PK XD',
+    title: 'Music of the Year (Melhor Música)',
     subtitle: 'A faixa musical que embalou as festas e palcos do ano',
     iconName: 'Music',
     description: 'Faixas originais, paródias musicais e trilhas sonoras autorais criadas inspiradas no universo PK XD.',
@@ -24,13 +24,24 @@ export const INITIAL_CATEGORIES: Category[] = [
     nominees: []
   },
   {
+    id: 'cat-thumbnail-ano',
+    title: 'Thumbnail of the Year (Melhor Capa)',
+    subtitle: 'A thumbnail mais criativa, chamativa e bem produzida do YouTube',
+    iconName: 'Sparkles',
+    description: 'Artes de capa, miniaturas e thumbnails que conquistaram cliques e marcaram a comunidade.',
+    status: 'voting_open',
+    order: 3,
+    sponsor: 'Creative Visual Lab',
+    nominees: []
+  },
+  {
     id: 'cat-clipe-visual',
     title: 'Melhor Clipe & Produção Audiovisual',
     subtitle: 'Edição cinematográfica, cenários deslumbrantes e efeitos visuais',
     iconName: 'Film',
     description: 'Direção de arte, cenografia em casas temáticas e edição de vídeo de alto padrão na comunidade PK XD.',
     status: 'voting_open',
-    order: 3,
+    order: 4,
     sponsor: 'Gold Camera Studio',
     nominees: []
   },

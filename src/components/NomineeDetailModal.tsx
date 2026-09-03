@@ -1,7 +1,8 @@
 import React from 'react';
 import { Nominee, Category } from '../types';
-import { X, Trophy, CheckCircle2, Flame, Award, Heart, Sparkles } from 'lucide-react';
+import { X, Trophy, CheckCircle2, Flame, Award, Heart, Sparkles, Music, Youtube, Image as ImageIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getYouTubeEmbedUrl, getNomineeYouTubeUrl, getNomineeThumbnailUrl, isThumbnailCategory } from '../utils/media';
 
 interface NomineeDetailModalProps {
   nominee: Nominee | null;
@@ -29,6 +30,12 @@ export const NomineeDetailModal: React.FC<NomineeDetailModalProps> = ({
   const votePercentage = totalCategoryVotes > 0 
     ? Math.round((nominee.votes / totalCategoryVotes) * 100) 
     : 0;
+
+  const youtubeUrl = getNomineeYouTubeUrl(nominee);
+  const youtubeEmbedUrl = getYouTubeEmbedUrl(youtubeUrl);
+  const thumbnailUrl = getNomineeThumbnailUrl(nominee);
+  const isThumbCat = isThumbnailCategory(category);
+  const displayThumbnail = thumbnailUrl || (isThumbCat ? nominee.avatarUrl : null);
 
   return (
     <AnimatePresence>
@@ -100,9 +107,12 @@ export const NomineeDetailModal: React.FC<NomineeDetailModalProps> = ({
 
               <div className="flex-1 text-center sm:text-left space-y-2">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  {nominee.pkxdId && nominee.pkxdId !== '#000' && !nominee.pkxdId.startsWith('#nom-') && (
+                  {nominee.pkxdId && 
+                    nominee.pkxdId !== '#000' && 
+                    !nominee.pkxdId.startsWith('#nom-') && 
+                    !nominee.pkxdId.startsWith('@') && (
                     <span className="px-3 py-1 rounded-lg text-xs font-mono font-bold bg-zinc-900 border border-zinc-700 text-zinc-300">
-                      ID: {nominee.pkxdId}
+                      ID PK XD: {nominee.pkxdId}
                     </span>
                   )}
                   {nominee.badge && (
@@ -125,6 +135,57 @@ export const NomineeDetailModal: React.FC<NomineeDetailModalProps> = ({
                 )}
               </div>
             </div>
+
+            {/* EMBEDDED YOUTUBE MUSIC PLAYER (Music of the Year) */}
+            {youtubeEmbedUrl && (
+              <div className="p-5 rounded-2xl bg-[#161722] border border-amber-500/40 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-amber-400">
+                    <Music className="w-4 h-4 text-amber-400 animate-pulse" />
+                    <span>🎵 Música Indicada (Player Incorporado)</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-red-600/30 text-red-300 border border-red-500/40 font-bold flex items-center gap-1">
+                    <Youtube className="w-3 h-3 text-red-400" />
+                    YouTube
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-300">
+                  Ouça a música indicada diretamente pelo site abaixo:
+                </p>
+                <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-zinc-700 bg-black shadow-2xl">
+                  <iframe
+                    src={youtubeEmbedUrl}
+                    title={`Música de ${nominee.name}`}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                    className="w-full h-full border-0"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* THUMBNAIL OF THE YEAR (16:9 Preview) */}
+            {displayThumbnail && (
+              <div className="p-5 rounded-2xl bg-[#161722] border border-amber-500/40 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-amber-400">
+                    <ImageIcon className="w-4 h-4 text-amber-400" />
+                    <span>🖼️ Thumbnail Indicada ao Troféu (16:9)</span>
+                  </div>
+                  <span className="text-[10px] text-amber-300/80 font-mono font-bold">Arte Concorrente</span>
+                </div>
+                <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-zinc-700 bg-zinc-950 shadow-2xl group">
+                  <img
+                    src={displayThumbnail}
+                    alt={`Thumbnail de ${nominee.name}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+                    <span className="text-xs text-white font-semibold">Capa por: {nominee.name} {nominee.handle}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Project / Work Nominated (if present and meaningful) */}
             {nominee.projectDescription && (

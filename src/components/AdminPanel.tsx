@@ -42,8 +42,11 @@ import {
   Upload,
   Image as ImageIcon,
   Camera,
-  X
+  X,
+  Music,
+  Play
 } from 'lucide-react';
+import { extractYouTubeId, getYouTubeEmbedUrl, isMusicCategory, isThumbnailCategory } from '../utils/media';
 import { triggerWinnerTrophyBlast, triggerGoldenConfetti } from '../utils/confetti';
 import { playFanfare, playAdminGavel, playVoteChime } from '../utils/audio';
 import { signInWithGoogle } from '../lib/firebase';
@@ -100,7 +103,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isAddingNominee, setIsAddingNominee] = useState<boolean>(false);
   const [editingNomineeId, setEditingNomineeId] = useState<string | null>(null);
   const nomineeFileInputRef = useRef<HTMLInputElement | null>(null);
+  const thumbnailFileInputRef = useRef<HTMLInputElement | null>(null);
   const [showUrlInput, setShowUrlInput] = useState<boolean>(false);
+  const [showThumbnailUrlInput, setShowThumbnailUrlInput] = useState<boolean>(false);
 
   const [nomineeForm, setNomineeForm] = useState<{
     name: string;
@@ -108,15 +113,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     avatarUrl: string;
     categoryId: string;
     reason: string;
+    youtubeUrl: string;
+    thumbnailUrl: string;
+    pkxdId: string;
   }>({
     name: '',
     handle: '',
     avatarUrl: '',
     categoryId: categories[0]?.id || '',
-    reason: ''
+    reason: '',
+    youtubeUrl: '',
+    thumbnailUrl: '',
+    pkxdId: ''
   });
 
-  // Handle local image file upload from mobile or desktop
+  // Handle local image file upload from mobile or desktop (Nominee Avatar)
   const handleNomineePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -139,6 +150,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setNomineeForm((prev) => ({ ...prev, avatarUrl: '' }));
     if (nomineeFileInputRef.current) {
       nomineeFileInputRef.current.value = '';
+    }
+  };
+
+  // Handle local thumbnail image upload (Thumbnail of the Year)
+  const handleThumbnailPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem é muito grande. Escolha uma imagem de até 5MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setNomineeForm((prev) => ({ ...prev, thumbnailUrl: String(event.target?.result) }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveThumbnailPhoto = () => {
+    setNomineeForm((prev) => ({ ...prev, thumbnailUrl: '' }));
+    if (thumbnailFileInputRef.current) {
+      thumbnailFileInputRef.current.value = '';
     }
   };
 
@@ -226,7 +263,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ? (nomineeForm.handle.trim().startsWith('@') ? nomineeForm.handle.trim() : `@${nomineeForm.handle.trim()}`)
       : '';
 
+    const cleanPkxdId = nomineeForm.pkxdId.trim()
+      ? (nomineeForm.pkxdId.trim().startsWith('#') ? nomineeForm.pkxdId.trim() : `#${nomineeForm.pkxdId.trim()}`)
+      : '';
+
     const cleanAvatar = nomineeForm.avatarUrl.trim() || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80';
+    const cleanYoutube = nomineeForm.youtubeUrl.trim();
+    const cleanThumbnail = nomineeForm.thumbnailUrl.trim();
 
     if (editingNomineeId) {
       // Edit existing (preserve real votes)
@@ -244,7 +287,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 projectTitle: nomineeForm.reason.trim() || 'Indicado Oficial XMA 2026',
                 projectDescription: nomineeForm.reason.trim() || '',
                 bio: nomineeForm.reason.trim() || '',
-                pkxdId: cleanHandle || `#${nomineeForm.name.replace(/\s+/g, '').slice(0, 8)}`
+                pkxdId: cleanPkxdId,
+                youtubeUrl: cleanYoutube,
+                projectMediaUrl: cleanYoutube || n.projectMediaUrl || '',
+                thumbnailUrl: cleanThumbnail
               };
             }
             return n;
@@ -263,9 +309,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         categoryId: nomineeForm.categoryId,
         projectTitle: nomineeForm.reason.trim() || 'Indicado Oficial XMA 2026',
         projectDescription: nomineeForm.reason.trim() || '',
-        projectType: 'media_creator',
-        pkxdId: cleanHandle || `#${nomineeForm.name.replace(/\s+/g, '').slice(0, 8)}`,
+        projectType: cleanYoutube ? 'music_clip' : 'media_creator',
+        pkxdId: cleanPkxdId,
         bio: nomineeForm.reason.trim() || '',
+        youtubeUrl: cleanYoutube,
+        projectMediaUrl: cleanYoutube || '',
+        thumbnailUrl: cleanThumbnail,
         votes: 0,
         verifiedVotes: 0,
         massVotes: 0
@@ -289,10 +338,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       handle: '',
       avatarUrl: '',
       categoryId: categories[0]?.id || '',
-      reason: ''
+      reason: '',
+      youtubeUrl: '',
+      thumbnailUrl: '',
+      pkxdId: ''
     });
     if (nomineeFileInputRef.current) {
       nomineeFileInputRef.current.value = '';
+    }
+    if (thumbnailFileInputRef.current) {
+      thumbnailFileInputRef.current.value = '';
     }
     playVoteChime();
   };
@@ -796,27 +851,170 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </select>
                   </div>
 
-                  {/* 3. Handle / @ (Opcional) */}
+                  {/* 3. Handle / @ (Social - NÃO é o ID do jogo) */}
                   <div>
                     <label className="block text-zinc-300 mb-1.5 font-semibold text-xs flex items-center justify-between">
-                      <span>@ Perfil / Rede Social</span>
+                      <span>@ Perfil Social (Instagram, TikTok ou YouTube)</span>
                       <span className="text-[10px] text-zinc-500 font-normal">Não obrigatório</span>
                     </label>
                     <input
                       type="text"
                       value={nomineeForm.handle}
                       onChange={(e) => setNomineeForm({ ...nomineeForm, handle: e.target.value })}
-                      placeholder="Ex: @lunastarlight_xd (Opcional)"
+                      placeholder="Ex: @seucanal (Não é o ID do jogo!)"
                       className="w-full px-3.5 py-2.5 bg-black/80 border border-zinc-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400"
+                    />
+                    <p className="text-[10px] text-zinc-500 mt-1">
+                      Apenas o @ da rede social. Não use para o código numérico do jogo.
+                    </p>
+                  </div>
+
+                  {/* 4. ID no Jogo PK XD (Opcional) */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-zinc-300 mb-1.5 font-semibold text-xs flex items-center justify-between">
+                      <span>ID PK XD no Jogo (Opcional - ex: #12345)</span>
+                      <span className="text-[10px] text-zinc-500 font-normal">Não obrigatório</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={nomineeForm.pkxdId}
+                      onChange={(e) => setNomineeForm({ ...nomineeForm, pkxdId: e.target.value })}
+                      placeholder="Ex: #58921 (Deixe em branco se não tiver ou não souber)"
+                      className="w-full px-3.5 py-2.5 bg-black/80 border border-zinc-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400 font-mono"
                     />
                   </div>
 
-                  {/* 4. Foto do Indicado (Upload direto do celular ou URL) */}
+                  {/* 5. SEÇÃO: LINK DA MÚSICA NO YOUTUBE (Incorpora player no site) */}
+                  <div className="sm:col-span-2 p-4 rounded-xl bg-[#13141f] border border-amber-500/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-zinc-200 font-bold text-xs flex items-center gap-2">
+                        <Music className="w-4 h-4 text-amber-400" />
+                        <span>🎵 Link da Música no YouTube (Incorporar Player no Site)</span>
+                      </label>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-red-600/20 text-red-300 border border-red-500/30 font-bold flex items-center gap-1">
+                        <Youtube className="w-3 h-3 text-red-400" />
+                        YouTube Embed
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-zinc-400">
+                      Cole o link do YouTube da música/clipe (ex: https://youtube.com/watch?v=... ou https://youtu.be/...). O site irá incorporar o player do YouTube automaticamente para todos ouvirem a música!
+                    </p>
+
+                    <input
+                      type="url"
+                      value={nomineeForm.youtubeUrl}
+                      onChange={(e) => setNomineeForm({ ...nomineeForm, youtubeUrl: e.target.value })}
+                      placeholder="https://www.youtube.com/watch?v=... ou https://youtu.be/..."
+                      className="w-full px-3.5 py-2.5 bg-black/80 border border-zinc-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400"
+                    />
+
+                    {/* Live preview of embedded player if link is valid */}
+                    {getYouTubeEmbedUrl(nomineeForm.youtubeUrl) && (
+                      <div className="pt-2 space-y-1.5">
+                        <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1">
+                          <Play className="w-3.5 h-3.5 text-amber-400" />
+                          Música pronta para incorporar no site:
+                        </span>
+                        <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-zinc-700 bg-black shadow-lg max-h-56">
+                          <iframe
+                            src={getYouTubeEmbedUrl(nomineeForm.youtubeUrl)!}
+                            title="Preview do YouTube"
+                            className="w-full h-full border-0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 6. SEÇÃO: FOTO DA THUMBNAIL (16:9 para Thumbnail of the Year) */}
+                  <div className="sm:col-span-2 p-4 rounded-xl bg-[#13141f] border border-amber-500/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-zinc-200 font-bold text-xs flex items-center gap-2">
+                        <ImageIcon className="w-4 h-4 text-amber-400" />
+                        <span>🖼️ Foto da Thumbnail / Capa (Formato 16:9)</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowThumbnailUrlInput(!showThumbnailUrlInput)}
+                        className="text-[11px] text-amber-400 hover:underline cursor-pointer"
+                      >
+                        {showThumbnailUrlInput ? 'Ocultar Link URL' : 'Prefere colar link URL?'}
+                      </button>
+                    </div>
+
+                    <p className="text-[11px] text-zinc-400">
+                      Escolha a foto da thumbnail do vídeo concorrente. Ela será exibida em alta qualidade no formato 16:9 no site!
+                    </p>
+
+                    <div className="space-y-3">
+                      {/* Thumbnail Preview 16:9 */}
+                      {nomineeForm.thumbnailUrl ? (
+                        <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-amber-400/50 bg-black shadow-lg">
+                          <img
+                            src={nomineeForm.thumbnailUrl}
+                            alt="Preview da Thumbnail"
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleRemoveThumbnailPhoto}
+                            className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-black/80 hover:bg-red-950 text-red-300 border border-red-700/50 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>Remover Foto da Thumbnail</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-full h-32 rounded-xl bg-black/60 border border-dashed border-zinc-700 flex flex-col items-center justify-center text-zinc-500 gap-1.5">
+                          <ImageIcon className="w-7 h-7 text-zinc-600" />
+                          <span className="text-[11px] font-semibold">Nenhuma foto de thumbnail selecionada ainda</span>
+                        </div>
+                      )}
+
+                      {/* Controls */}
+                      <input
+                        ref={thumbnailFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleThumbnailPhotoUpload}
+                        className="hidden"
+                      />
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => thumbnailFileInputRef.current?.click()}
+                          className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-xs inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-amber-400/20 transition-all hover:scale-[1.02]"
+                        >
+                          <Upload className="w-4 h-4 text-black" />
+                          <span>{nomineeForm.thumbnailUrl ? 'Trocar Foto da Thumbnail' : '📱 Escolher Foto da Thumbnail do Celular'}</span>
+                        </button>
+                      </div>
+
+                      {showThumbnailUrlInput && (
+                        <div className="pt-2 border-t border-zinc-800">
+                          <label className="block text-zinc-400 mb-1 text-[11px]">Ou cole o link URL direto da thumbnail:</label>
+                          <input
+                            type="url"
+                            value={nomineeForm.thumbnailUrl}
+                            onChange={(e) => setNomineeForm({ ...nomineeForm, thumbnailUrl: e.target.value })}
+                            placeholder="https://..."
+                            className="w-full px-3 py-2 bg-black border border-zinc-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 7. Foto da Pessoa / Criador (Upload direto do celular ou URL) */}
                   <div className="sm:col-span-2 p-4 rounded-xl bg-black/50 border border-zinc-800 space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="block text-zinc-200 font-bold text-xs flex items-center gap-2">
                         <Camera className="w-4 h-4 text-amber-400" />
-                        <span>Foto do Indicado (Do Celular ou Galeria)</span>
+                        <span>Foto / Avatar da Pessoa (Do Celular ou Galeria)</span>
                       </label>
                       <button
                         type="button"
@@ -863,7 +1061,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-xs inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-amber-400/20 transition-all hover:scale-[1.02]"
                           >
                             <Upload className="w-4 h-4 text-black" />
-                            <span>{nomineeForm.avatarUrl ? 'Trocar Foto do Celular' : '📱 Escolher Foto do Celular'}</span>
+                            <span>{nomineeForm.avatarUrl ? 'Trocar Foto da Pessoa' : '📱 Escolher Foto da Pessoa do Celular'}</span>
                           </button>
 
                           {nomineeForm.avatarUrl && (
@@ -898,7 +1096,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     )}
                   </div>
 
-                  {/* 5. Motivo / Observação (Opcional) */}
+                  {/* 8. Motivo / Observação (Opcional) */}
                   <div className="sm:col-span-2">
                     <label className="block text-zinc-300 mb-1 font-semibold text-xs flex items-center justify-between">
                       <span>Motivo da Indicação / Observação</span>
@@ -1004,7 +1202,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 handle: nominee.handle || '',
                                 avatarUrl: nominee.avatarUrl || '',
                                 categoryId: nominee.categoryId,
-                                reason: nominee.projectDescription || nominee.bio || ''
+                                reason: nominee.projectDescription || nominee.bio || '',
+                                youtubeUrl: nominee.youtubeUrl || nominee.projectMediaUrl || '',
+                                thumbnailUrl: nominee.thumbnailUrl || '',
+                                pkxdId: nominee.pkxdId && !nominee.pkxdId.startsWith('@') ? nominee.pkxdId : ''
                               });
                               setIsAddingNominee(true);
                             }}

@@ -14,11 +14,16 @@ import {
   UserCheck, 
   LogIn,
   Layers,
-  Repeat
+  Repeat,
+  Youtube,
+  Play,
+  Image as ImageIcon,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { triggerGoldenConfetti, triggerWinnerTrophyBlast } from '../utils/confetti';
 import { playVoteChime, playFanfare } from '../utils/audio';
+import { getYouTubeEmbedUrl, getNomineeYouTubeUrl, getNomineeThumbnailUrl, isMusicCategory, isThumbnailCategory } from '../utils/media';
 
 interface RealTimeVotingProps {
   categories: Category[];
@@ -46,6 +51,7 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
   const [clickComboCount, setClickComboCount] = useState<number>(0);
   const [comboTimer, setComboTimer] = useState<NodeJS.Timeout | null>(null);
   const [recentlyVotedNomineeId, setRecentlyVotedNomineeId] = useState<string | null>(null);
+  const [playingMusicNomineeId, setPlayingMusicNomineeId] = useState<string | null>(null);
 
   const currentCategory = categories[activeCategoryIndex] || categories[0];
   const totalCategories = categories.length;
@@ -354,6 +360,14 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
                     ? Math.round((nominee.votes / totalCategoryVotes) * 100)
                     : 0;
 
+                const isThumbCat = isThumbnailCategory(currentCategory);
+                const isMusCat = isMusicCategory(currentCategory);
+                const nomineeThumb = getNomineeThumbnailUrl(nominee);
+                const displayThumb = isThumbCat ? (nomineeThumb || nominee.avatarUrl) : nomineeThumb;
+                const youtubeUrl = getNomineeYouTubeUrl(nominee);
+                const embedUrl = getYouTubeEmbedUrl(youtubeUrl);
+                const isPlayingThisMusic = playingMusicNomineeId === nominee.id;
+
                 return (
                   <motion.div
                     key={nominee.id}
@@ -366,6 +380,43 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
                         : 'bg-[#13141c] border-zinc-800/80 hover:border-zinc-700'
                     }`}
                   >
+                    {/* Media Preview if Thumbnail category or has Thumbnail */}
+                    {displayThumb && !isPlayingThisMusic && (
+                      <div className="mb-4 rounded-xl overflow-hidden border border-amber-500/30 bg-black aspect-video relative max-h-56">
+                        <img
+                          src={displayThumb}
+                          alt={`Thumbnail de ${nominee.name}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-2 right-2">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-black/80 border border-amber-400/50 text-amber-300 flex items-center gap-1">
+                            <ImageIcon className="w-3 h-3 text-amber-400" />
+                            Thumbnail Concorrente (16:9)
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* YouTube Inline Player if playing */}
+                    {isPlayingThisMusic && embedUrl && (
+                      <div className="mb-4 rounded-xl overflow-hidden border border-red-500/50 bg-black aspect-video relative max-h-60">
+                        <iframe
+                          src={`${embedUrl}?autoplay=1`}
+                          title={`Música de ${nominee.name}`}
+                          className="w-full h-full border-0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                        <button
+                          onClick={() => setPlayingMusicNomineeId(null)}
+                          className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/80 hover:bg-zinc-800 text-white cursor-pointer z-20"
+                          title="Fechar Música"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       {/* Nominee Profile */}
                       <div className="flex items-center gap-4">
@@ -392,9 +443,11 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
                             <h3 className="text-base sm:text-lg font-bold text-white font-cinzel">
                               {nominee.name}
                             </h3>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-black/60 border border-zinc-700 text-zinc-300">
-                              {nominee.pkxdId}
-                            </span>
+                            {nominee.pkxdId && !nominee.pkxdId.startsWith('@') && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-black/60 border border-zinc-700 text-zinc-300">
+                                ID: {nominee.pkxdId}
+                              </span>
+                            )}
                             {isLeader && (
                               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                                 👑 1º Lugar
@@ -402,16 +455,38 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
                             )}
                           </div>
 
-                          <p className="text-xs text-amber-400 font-medium">
-                            {nominee.handle} • <span className="text-zinc-300">{nominee.projectTitle}</span>
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            {nominee.handle && (
+                              <span className="text-amber-400 font-semibold bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/20">
+                                {nominee.handle}
+                              </span>
+                            )}
+                            {nominee.projectTitle && (
+                              <span className="text-zinc-300">{nominee.projectTitle}</span>
+                            )}
+                          </div>
+
+                          {/* Quick Music Player button if nominee has YouTube link */}
+                          {embedUrl && (
+                            <div className="pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setPlayingMusicNomineeId(isPlayingThisMusic ? null : nominee.id)}
+                                className="py-1 px-3 rounded-lg bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300 text-[11px] font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                <Youtube className="w-3.5 h-3.5 text-red-400" />
+                                <Play className="w-3 h-3 fill-current" />
+                                <span>{isPlayingThisMusic ? 'Parar Música' : '🎵 Tocar Música no YouTube'}</span>
+                              </button>
+                            </div>
+                          )}
 
                           <button
                             onClick={() => onSelectNominee(nominee, currentCategory)}
                             className="text-[11px] text-zinc-400 hover:text-amber-300 underline underline-offset-2 flex items-center gap-1 cursor-pointer pt-0.5"
                           >
                             <Info className="w-3 h-3" />
-                            <span>Ver biografia e detalhes completos</span>
+                            <span>Ver detalhes completos</span>
                           </button>
                         </div>
                       </div>
