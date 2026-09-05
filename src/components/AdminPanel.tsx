@@ -61,6 +61,7 @@ import {
   saveAllCategoriesToFirestore, 
   saveSettingsToFirestore 
 } from '../lib/firestoreService';
+import { setItemPersistent } from '../utils/persistentStorage';
 
 interface AdminPanelProps {
   categories: Category[];
@@ -230,14 +231,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const syncToCloud = async (cats: Category[]) => {
     try {
       setSyncStatus('saving');
-      await saveAllCategoriesToFirestore(cats);
-      setSyncStatus('synced');
+      setItemPersistent('xma_categories_2026_v7', cats);
+      const res = await saveAllCategoriesToFirestore(cats);
+      setSyncStatus(res ? 'synced' : 'idle');
       setTimeout(() => {
         setSyncStatus('idle');
       }, 4000);
     } catch (err) {
-      console.error('Erro ao sincronizar categorias com Firestore:', err);
-      setSyncStatus('error');
+      console.warn('Erro ao sincronizar categorias com Firestore (salvo localmente):', err);
+      setSyncStatus('idle');
     }
   };
 

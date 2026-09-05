@@ -77,31 +77,81 @@ export default function App() {
     return true; // Locked for non-admins until countdown ends!
   });
 
-  // Filter out any leftover hardcoded mock IDs from earlier versions
-  const sanitizeNominees = (nominees: Nominee[]): Nominee[] => {
-    if (!Array.isArray(nominees)) return [];
-    const mockIds = new Set([
-      'nom-admin', 'nom-nimda', 'nom-koosh', 'nom-bia-gamer',
-      'nom-hit-sinfonia', 'nom-hit-dourado', 'nom-hit-crazyrun',
-      'nom-clipe-gravidade', 'nom-clipe-mansao',
-      'nom-look-ouro', 'nom-look-cyber',
-      'nom-rev-pedro', 'nom-rev-luna',
-      'nom-collab-squad'
-    ]);
-    return nominees.filter((n) => !mockIds.has(n.id));
+  // Smart Category Merging: Preserves both initial official nominees and any user-created categories/nominees
+  const mergeCategories = (base: Category[], incoming: Category[]): Category[] => {
+    const map = new Map<string, Category>();
+    for (const cat of base) {
+      if (cat.id) map.set(cat.id, { ...cat, nominees: [...(cat.nominees || [])] });
+    }
+    for (const inc of incoming) {
+      if (!inc.id) continue;
+      if (!map.has(inc.id)) {
+        map.set(inc.id, { ...inc, nominees: [...(inc.nominees || [])] });
+      } else {
+        const existing = map.get(inc.id)!;
+        const nomMap = new Map<string, Nominee>();
+        for (const n of existing.nominees || []) {
+          if (n.id) nomMap.set(n.id, n);
+        }
+        for (const n of inc.nominees || []) {
+          if (n.id) {
+            if (!nomMap.has(n.id)) {
+              nomMap.set(n.id, n);
+            } else {
+              const curr = nomMap.get(n.id)!;
+              nomMap.set(n.id, {
+                ...curr,
+                ...n,
+                votes: Math.max(curr.votes || 0, n.votes || 0),
+                verifiedVotes: Math.max(curr.verifiedVotes || 0, n.verifiedVotes || 0),
+                massVotes: Math.max(curr.massVotes || 0, n.massVotes || 0)
+              });
+            }
+          }
+        }
+        map.set(inc.id, {
+          ...existing,
+          ...inc,
+          nominees: Array.from(nomMap.values())
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => (a.order || 0) - (b.order || 0));
   };
 
-  // Categories & Nominees State (100% Admin Controlled)
+  const mergeWithInitialCategories = (loaded: Category[]): Category[] => {
+    return mergeCategories(INITIAL_CATEGORIES, loaded);
+  };
+
+  const mergeCommunityNominations = (current: CommunityNomination[], incoming: CommunityNomination[]): CommunityNomination[] => {
+    const map = new Map<string, CommunityNomination>();
+    for (const nom of current) {
+      if (nom.id) map.set(nom.id, nom);
+    }
+    for (const inc of incoming) {
+      if (!inc.id) continue;
+      if (!map.has(inc.id)) {
+        map.set(inc.id, inc);
+      } else {
+        const existing = map.get(inc.id)!;
+        map.set(inc.id, {
+          ...existing,
+          ...inc,
+          communityLikes: Math.max(existing.communityLikes || 0, inc.communityLikes || 0)
+        });
+      }
+    }
+    return Array.from(map.values());
+  };
+
+  // Categories & Nominees State (100% Admin Controlled + Initial Data Safeguard)
   const [categories, setCategories] = useState<Category[]>(() => {
     try {
       const saved = localStorage.getItem('xma_categories_2026_v7');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((cat: Category) => ({
-            ...cat,
-            nominees: sanitizeNominees(cat.nominees || [])
-          }));
+          return mergeWithInitialCategories(parsed);
         }
       }
       return INITIAL_CATEGORIES;
@@ -245,27 +295,14 @@ export default function App() {
         const savedCats = await getItemPersistent<Category[]>('xma_categories_2026_v7', []);
         if (Array.isArray(savedCats) && savedCats.length > 0) {
           setCategories((current) => {
-            // Do not override if already hydrated from cloud Firestore
-            if (isCloudSyncedRef.current) return current;
-            const currentNomineeCount = current.reduce((acc, c) => acc + (c.nominees?.length || 0), 0);
-            const savedNomineeCount = savedCats.reduce((acc, c) => acc + (c.nominees?.length || 0), 0);
-            if (savedNomineeCount >= currentNomineeCount) {
-              return savedCats.map((cat) => ({
-                ...cat,
-                nominees: sanitizeNominees(cat.nominees || [])
-              }));
-            }
-            return current;
+            return mergeWithInitialCategories(mergeCategories(current, savedCats));
           });
         }
 
         const savedNoms = await getItemPersistent<CommunityNomination[]>('xma_community_nominations_2026_v7', []);
         if (Array.isArray(savedNoms) && savedNoms.length > 0) {
           setCommunityNominations((current) => {
-            if (savedNoms.length >= current.length) {
-              return savedNoms;
-            }
-            return current;
+            return mergeCommunityNominations(current, savedNoms);
           });
         }
       } catch (e) {
@@ -275,7 +312,7 @@ export default function App() {
     loadPersistentData();
   }, []);
 
-  // 2. Real-time Cloud Sync with Firestore
+  // 2. Real-time Cloud Sync with Firestore (With Non-Destructive Merging)
   useEffect(() => {
     let isMounted = true;
 
@@ -283,21 +320,22 @@ export default function App() {
       try {
         await testFirestoreConnection();
         const cloudCats = await getCategoriesOnce();
-        if (isMounted && cloudCats && cloudCats.length > 0) {
-          const sanitized = cloudCats.map((c) => ({
-            ...c,
-            nominees: sanitizeNominees(c.nominees || [])
-          }));
-          setCategories(sanitized);
-          setItemPersistent('xma_categories_2026_v7', sanitized);
-          isCloudSyncedRef.current = true;
-        } else if (isMounted && (!cloudCats || cloudCats.length === 0)) {
-          // If Firestore is brand new and completely empty, seed it with the official categories
-          await saveAllCategoriesToFirestore(INITIAL_CATEGORIES);
-          isCloudSyncedRef.current = true;
+        if (isMounted && Array.isArray(cloudCats)) {
+          if (cloudCats.length > 0) {
+            setCategories((prev) => {
+              const merged = mergeWithInitialCategories(mergeCategories(prev, cloudCats));
+              setItemPersistent('xma_categories_2026_v7', merged);
+              return merged;
+            });
+            isCloudSyncedRef.current = true;
+          } else {
+            // Firestore is freshly connected and empty, seed it with current categories
+            await saveAllCategoriesToFirestore(categories);
+            isCloudSyncedRef.current = true;
+          }
         }
       } catch (err) {
-        console.error('Erro ao inicializar categorias do Firestore:', err);
+        console.warn('Firestore offline ou API não habilitada; operando em modo persistente local (IndexedDB):', err);
       }
     }
 
@@ -306,12 +344,11 @@ export default function App() {
     const unsubCategories = subscribeCategories((cloudCategories) => {
       if (!isMounted) return;
       if (Array.isArray(cloudCategories) && cloudCategories.length > 0) {
-        const sanitized = cloudCategories.map((c) => ({
-          ...c,
-          nominees: sanitizeNominees(c.nominees || [])
-        }));
-        setCategories(sanitized);
-        setItemPersistent('xma_categories_2026_v7', sanitized);
+        setCategories((prev) => {
+          const merged = mergeWithInitialCategories(mergeCategories(prev, cloudCategories));
+          setItemPersistent('xma_categories_2026_v7', merged);
+          return merged;
+        });
         isCloudSyncedRef.current = true;
       }
     });
@@ -319,8 +356,11 @@ export default function App() {
     const unsubNominations = subscribeCommunityNominations((cloudNominations) => {
       if (!isMounted) return;
       if (Array.isArray(cloudNominations) && cloudNominations.length > 0) {
-        setCommunityNominations(cloudNominations);
-        setItemPersistent('xma_community_nominations_2026_v7', cloudNominations);
+        setCommunityNominations((prev) => {
+          const merged = mergeCommunityNominations(prev, cloudNominations);
+          setItemPersistent('xma_community_nominations_2026_v7', merged);
+          return merged;
+        });
       }
     });
 
@@ -456,24 +496,36 @@ export default function App() {
     newNom: Omit<CommunityNomination, 'id' | 'createdAt' | 'status' | 'communityLikes'>
   ) => {
     const submission: CommunityNomination = {
-      id: `comm-${Date.now()}`,
+      id: `comm-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       createdAt: 'Agora há pouco',
       status: 'pending',
       communityLikes: 1,
       ...newNom
     };
 
-    setCommunityNominations((prev) => [submission, ...prev]);
-    saveCommunityNominationToFirestore(submission);
+    setCommunityNominations((prev) => {
+      const updated = [submission, ...prev.filter((p) => p.id !== submission.id)];
+      setItemPersistent('xma_community_nominations_2026_v7', updated);
+      return updated;
+    });
+
+    try {
+      saveCommunityNominationToFirestore(submission);
+    } catch (err) {
+      console.warn('Erro ao salvar indicação na nuvem (mantida localmente):', err);
+    }
   };
 
   // Community Nomination Like
   const handleLikeNomination = (nomId: string) => {
     setCommunityNominations((prev) => {
       const updated = prev.map((n) => (n.id === nomId ? { ...n, communityLikes: n.communityLikes + 1 } : n));
+      setItemPersistent('xma_community_nominations_2026_v7', updated);
       const target = updated.find((n) => n.id === nomId);
       if (target) {
-        saveCommunityNominationToFirestore(target);
+        try {
+          saveCommunityNominationToFirestore(target);
+        } catch {}
       }
       return updated;
     });

@@ -1350,134 +1350,351 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
               </div>
             )}
 
-            {/* TAB 3: INDICAÇÕES ENCERRADAS (COMUNICADO OFICIAL) */}
+            {/* TAB 3: INDICAÇÕES DA COMUNIDADE (FORMULÁRIO ATIVO) */}
             {activeTeaserTab === 'nominate' && (
-              <div className="w-full max-w-2xl mx-auto rounded-3xl bg-gradient-to-b from-[#151624] via-[#10111a] to-[#0a0b12] border-2 border-amber-500/50 p-6 sm:p-8 backdrop-blur-2xl shadow-2xl shadow-amber-950/40 text-left overflow-hidden relative">
+              <div className="w-full max-w-3xl mx-auto rounded-3xl bg-gradient-to-b from-[#151624] via-[#10111a] to-[#0a0b12] border-2 border-amber-500/50 p-6 sm:p-8 backdrop-blur-2xl shadow-2xl shadow-amber-950/40 text-left overflow-hidden relative">
                 {/* Ambient gold glow */}
                 <div className="absolute -top-16 -right-16 w-60 h-60 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
-                {/* Header Closed Status */}
+                {/* Header Active Status */}
                 <div className="relative z-10 space-y-3 border-b border-zinc-800/80 pb-6 text-center">
-                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-red-500/20 border-2 border-red-500/60 text-red-300 animate-pulse">
-                    <Lock className="w-3.5 h-3.5 text-red-400" />
-                    <span>FASE DE INDICAÇÕES OFICIALMENTE ENCERRADA</span>
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/20 border-2 border-emerald-500/60 text-emerald-300">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>FASE DE INDICAÇÕES OFICIALMENTE ABERTA</span>
                   </div>
 
                   <h3 className="text-2xl sm:text-3xl font-black font-cinzel text-white flex items-center justify-center gap-2">
-                    <span>Indicações Encerradas</span>
+                    <span>Faça sua Indicação para o XMA 2026</span>
                     <Trophy className="w-6 h-6 text-amber-400 shrink-0" />
                   </h3>
 
                   <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed max-w-lg mx-auto">
-                    O período de envio de sugestões e indicações da comunidade foi finalizado com sucesso. O comitê organizador oficial do <strong className="text-amber-300">XMA 2026</strong> já consolidou os indicados de cada categoria!
+                    Indique criadores de conteúdo, astros do PK XD ou sugira novas categorias para serem incluídas na gala oficial!
                   </p>
                 </div>
 
-                {/* Status Box & Information */}
-                <div className="mt-6 space-y-4 relative z-10">
-                  <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-950/40 via-zinc-900/60 to-amber-950/40 border border-amber-500/30 space-y-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
-                        <Sparkles className="w-4 h-4 text-amber-300" />
+                {/* Success Notification */}
+                <AnimatePresence>
+                  {showSuccessBadge && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="mt-4 p-4 rounded-2xl bg-emerald-950/70 border border-emerald-500/60 text-emerald-200 flex items-center gap-3 relative z-10"
+                    >
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                      <div className="text-xs">
+                        <strong className="block text-white font-bold">Indicação Enviada com Sucesso!</strong>
+                        Sua sugestão foi salva de forma permanente e já consta na lista da comunidade abaixo.
                       </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-black text-amber-200 uppercase tracking-wide">
-                          Próxima Etapa: Votação Popular Aberta
-                        </h4>
-                        <p className="text-[11px] text-zinc-400">
-                          Data da Abertura das Urnas Oficiais
-                        </p>
-                      </div>
-                    </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-                    <div className="p-3.5 rounded-xl bg-black/70 border border-zinc-800 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-amber-400" />
-                        <span className="text-xs font-bold text-zinc-200">15 de Setembro de 2026</span>
-                      </div>
-                      <span className="text-xs font-mono font-bold text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-lg border border-amber-400/30">
-                        19:00 (BRT)
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-zinc-300 leading-relaxed">
-                      Assim que o cronômetro zerar, a plataforma abrirá instantaneamente para que todos os jogadores e fãs do PK XD votem nos seus criadores favoritos!
-                    </p>
+                {/* Validation Error Notification */}
+                {nominationValidationError && (
+                  <div className="mt-4 p-4 rounded-2xl bg-red-950/70 border border-red-500/60 text-red-200 flex items-center gap-3 relative z-10 text-xs">
+                    <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+                    <div>{nominationValidationError}</div>
                   </div>
+                )}
 
-                  {/* Summary Metric Stats */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
-                    <div className="p-3.5 rounded-2xl bg-zinc-950/80 border border-zinc-800">
-                      <div className="text-lg sm:text-xl font-black font-cinzel text-amber-300">
-                        {categories.length}
-                      </div>
-                      <div className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider mt-0.5">
-                        Categorias
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-2xl bg-zinc-950/80 border border-zinc-800">
-                      <div className="text-lg sm:text-xl font-black font-cinzel text-amber-300">
-                        {categories.reduce((acc, c) => acc + (c.nominees?.length || 0), 0)}
-                      </div>
-                      <div className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider mt-0.5">
-                        Indicados
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-2xl bg-zinc-950/80 border border-zinc-800 col-span-2 sm:col-span-1">
-                      <div className="text-lg sm:text-xl font-black font-cinzel text-emerald-400">
-                        100%
-                      </div>
-                      <div className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider mt-0.5">
-                        Auditado
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Quick Action to view Nominees */}
+                {/* Mode Selector Tabs (Creator vs Category) */}
+                <div className="mt-6 flex items-center justify-center gap-2 p-1.5 rounded-2xl bg-zinc-950/80 border border-zinc-800 relative z-10">
                   <button
                     type="button"
-                    onClick={() => setActiveTeaserTab('nominees')}
-                    className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-black font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xl shadow-amber-500/25 hover:scale-[1.02] active:scale-[0.98]"
+                    onClick={() => {
+                      setNominationTab('creator');
+                      setNominationValidationError(null);
+                    }}
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      nominationTab === 'creator'
+                        ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black shadow-lg shadow-amber-500/20 font-black'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
                   >
-                    <Trophy className="w-4 h-4 text-black" />
-                    <span>Ver Indicados Confirmados</span>
-                    <ArrowRight className="w-4 h-4 text-black" />
+                    <UserPlus className="w-4 h-4" />
+                    <span>Indicar Criador ou Astro</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNominationTab('category');
+                      setNominationValidationError(null);
+                    }}
+                    className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      nominationTab === 'category'
+                        ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black shadow-lg shadow-amber-500/20 font-black'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    <Lightbulb className="w-4 h-4" />
+                    <span>Sugerir Nova Categoria</span>
                   </button>
                 </div>
 
-                {/* Archived Community Nominations Preview (Read-only) */}
+                {/* Active Nomination Form */}
+                <form onSubmit={handleNominationSubmit} className="mt-6 space-y-4 relative z-10">
+                  {/* Player Sender Info */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider">
+                        Seu Nome / Nickname
+                      </label>
+                      <input
+                        type="text"
+                        value={senderName}
+                        onChange={(e) => setSenderName(e.target.value)}
+                        placeholder="Ex: PedroGamer"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-800 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/80 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider">
+                        Sua PK XD Tag
+                      </label>
+                      <input
+                        type="text"
+                        value={senderPkxdTag}
+                        onChange={(e) => setSenderPkxdTag(e.target.value)}
+                        placeholder="Ex: #000"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-800 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/80 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {nominationTab === 'creator' ? (
+                    <>
+                      {/* Nominee Basic Details */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1">
+                            <span>Nome do Indicado</span>
+                            <span className="text-amber-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={nomineeName}
+                            onChange={(e) => setNomineeName(e.target.value)}
+                            placeholder="Ex: Bia Gamer ou Canal PK"
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-800 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/80 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider">
+                            PK XD Tag do Indicado
+                          </label>
+                          <input
+                            type="text"
+                            value={nomineePkxdId}
+                            onChange={(e) => setNomineePkxdId(e.target.value)}
+                            placeholder="Ex: #1234"
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-800 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/80 transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Category Selection */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1">
+                          <span>Categoria Concorrente</span>
+                          <span className="text-amber-400">*</span>
+                        </label>
+                        <select
+                          value={selectedCategoryId}
+                          onChange={(e) => setSelectedCategoryId(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-800 text-white text-xs focus:outline-none focus:border-amber-400/80 transition-all"
+                        >
+                          {categories.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.title} ({cat.subtitle || 'Oficial'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Social Media Links (At least 1 required) */}
+                      <div className="space-y-2 p-3.5 rounded-2xl bg-zinc-950/60 border border-zinc-800/80">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Redes Sociais do Indicado (Informe pelo menos 1)</span>
+                            <span className="text-amber-400">*</span>
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          <div className="relative">
+                            <Instagram className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={nomineeInstagram}
+                              onChange={(e) => setNomineeInstagram(e.target.value)}
+                              placeholder="@instagram"
+                              className="w-full pl-8 pr-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+                          <div className="relative">
+                            <Video className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={nomineeTiktok}
+                              onChange={(e) => setNomineeTiktok(e.target.value)}
+                              placeholder="@tiktok"
+                              className="w-full pl-8 pr-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+                          <div className="relative">
+                            <Youtube className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={nomineeYoutube}
+                              onChange={(e) => setNomineeYoutube(e.target.value)}
+                              placeholder="@youtube / canal"
+                              className="w-full pl-8 pr-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Photo / Avatar */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider flex items-center justify-between">
+                          <span>Foto ou Avatar do Indicado</span>
+                          {isCompressingPhoto && <span className="text-amber-400 font-mono text-[10px]">Otimizando imagem...</span>}
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            ref={countdownFileInputRef}
+                            onChange={handleNominationPhotoChange}
+                            className="hidden"
+                            id="countdown-nominee-photo-input"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => countdownFileInputRef.current?.click()}
+                            className="px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-bold flex items-center gap-2 cursor-pointer transition-all shrink-0"
+                          >
+                            <ImageIcon className="w-4 h-4 text-amber-400" />
+                            <span>Carregar Arquivo</span>
+                          </button>
+                          <input
+                            type="text"
+                            value={nomineeAvatarUrl}
+                            onChange={(e) => setNomineeAvatarUrl(e.target.value)}
+                            placeholder="Ou cole a URL da imagem aqui (https://...)"
+                            className="flex-1 px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-800 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/80 transition-all"
+                          />
+                          {nomineeAvatarUrl && (
+                            <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-amber-400/40 overflow-hidden shrink-0">
+                              <img src={nomineeAvatarUrl} alt="Preview" className="w-full h-full object-cover" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Suggest New Category Fields */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1">
+                          <span>Nome da Categoria Sugerida</span>
+                          <span className="text-amber-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={customCategoryName}
+                          onChange={(e) => setCustomCategoryName(e.target.value)}
+                          placeholder="Ex: Melhor Construtor de Casas ou Melhor Cosplay PK XD"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-800 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/80 transition-all"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Reason / Bio */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider">
+                      Por que você indica este criador / categoria?
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={nominationReason}
+                      onChange={(e) => setNominationReason(e.target.value)}
+                      placeholder="Conte para a comissão os motivos do destaque no PK XD..."
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/90 border border-zinc-800 text-white text-xs placeholder:text-zinc-600 focus:outline-none focus:border-amber-400/80 transition-all resize-none"
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    className="w-full mt-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-black font-black text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xl shadow-amber-500/25 hover:scale-[1.01] active:scale-[0.99]"
+                  >
+                    <Send className="w-4 h-4 text-black" />
+                    <span>Enviar Indicação Oficial</span>
+                  </button>
+                </form>
+
+                {/* Community Nominations Feed (Real-time & Persisted) */}
                 {communityNominations && communityNominations.length > 0 && (
                   <div className="mt-8 pt-6 border-t border-zinc-800 space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-amber-400" />
                         <h4 className="text-sm font-bold text-white font-cinzel">
-                          Sugestões da Comunidade Recebidas
+                          Indicações da Comunidade ({communityNominations.length})
                         </h4>
                       </div>
-                      <span className="text-[11px] font-mono text-zinc-400">
-                        {communityNominations.length} arquivadas
+                      <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30">
+                        Ativas e Auditadas
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-1">
                       {communityNominations.map((nom) => (
                         <div
                           key={nom.id}
-                          className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 flex items-center gap-3 text-xs"
+                          className="p-3.5 rounded-2xl bg-zinc-950/80 border border-zinc-800/80 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-2.5"
                         >
-                          <div className="w-9 h-9 rounded-lg bg-amber-400/10 border border-amber-400/30 overflow-hidden shrink-0 flex items-center justify-center">
-                            {nom.avatarUrl ? (
-                              <img src={nom.avatarUrl} alt={nom.nomineeName} className="w-full h-full object-cover" />
-                            ) : (
-                              <Trophy className="w-4 h-4 text-amber-400" />
-                            )}
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-400/10 border border-amber-400/30 overflow-hidden shrink-0 flex items-center justify-center">
+                              {nom.avatarUrl ? (
+                                <img src={nom.avatarUrl} alt={nom.nomineeName} className="w-full h-full object-cover" />
+                              ) : (
+                                <Trophy className="w-5 h-5 text-amber-400" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-bold text-white text-xs truncate">{nom.nomineeName}</div>
+                              <div className="text-[10px] text-amber-300 truncate font-semibold">{nom.categoryTitle}</div>
+                              {nom.nomineePkxdId && (
+                                <div className="text-[9px] font-mono text-zinc-400">{nom.nomineePkxdId}</div>
+                              )}
+                            </div>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="font-bold text-white truncate">{nom.nomineeName}</div>
-                            <div className="text-[10px] text-amber-300 truncate">{nom.categoryTitle}</div>
+
+                          {nom.reason && (
+                            <p className="text-[10px] text-zinc-400 line-clamp-2 leading-relaxed italic bg-black/40 p-2 rounded-lg border border-zinc-850">
+                              "{nom.reason}"
+                            </p>
+                          )}
+
+                          <div className="flex items-center justify-between pt-1 border-t border-zinc-850 text-[10px]">
+                            <span className="text-zinc-500 truncate max-w-[140px]">
+                              Por {nom.submittedByName}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => onLikeNomination && onLikeNomination(nom.id)}
+                              className="px-2 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-pink-400 font-bold flex items-center gap-1 border border-pink-500/30 cursor-pointer transition-transform active:scale-95"
+                            >
+                              <Heart className="w-3 h-3 fill-pink-400" />
+                              <span>{nom.communityLikes || 1}</span>
+                            </button>
                           </div>
                         </div>
                       ))}

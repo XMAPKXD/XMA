@@ -102,7 +102,7 @@ export async function getCategoriesOnce(): Promise<Category[] | null> {
   try {
     const colRef = collection(db, 'categories');
     const snapshot = await getDocs(colRef);
-    if (snapshot.empty) return null;
+    if (snapshot.empty) return [];
 
     const loadedCategories: Category[] = [];
     snapshot.forEach((docSnap) => {
@@ -143,28 +143,15 @@ export async function deleteCategoryFromFirestore(categoryId: string): Promise<b
   }
 }
 
-// Batch save multiple categories to Firestore (and clean up removed ones)
+// Batch save multiple categories to Firestore safely
 export async function saveAllCategoriesToFirestore(categories: Category[]): Promise<boolean> {
   if (!db || !Array.isArray(categories)) return false;
   try {
-    // 1. Save current categories with clean data
     for (const cat of categories) {
       if (!cat.id) continue;
       const cleaned = cleanForFirestore(cat);
       await setDoc(doc(db, 'categories', cat.id), cleaned, { merge: true });
     }
-
-    // 2. Check if any category was deleted from Firestore
-    try {
-      const activeIds = new Set(categories.map((c) => c.id));
-      const existingSnap = await getDocs(collection(db, 'categories'));
-      for (const docSnap of existingSnap.docs) {
-        if (!activeIds.has(docSnap.id)) {
-          await deleteDoc(docSnap.ref);
-        }
-      }
-    } catch {}
-
     return true;
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, 'categories');
