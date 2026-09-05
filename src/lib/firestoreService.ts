@@ -4,6 +4,7 @@ import {
   getDocFromServer, 
   getDocs, 
   setDoc, 
+  deleteDoc,
   onSnapshot, 
   query,
   orderBy 
@@ -57,6 +58,29 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error('Firestore Error:', JSON.stringify(errInfo));
 }
 
+/**
+ * Strips undefined values recursively so Firestore setDoc never throws
+ * "Function setDoc() called with invalid data. Unsupported field value: undefined"
+ */
+export function cleanForFirestore<T>(data: T): any {
+  if (data === null || data === undefined) {
+    return null;
+  }
+  if (Array.isArray(data)) {
+    return data.map((item) => cleanForFirestore(item));
+  }
+  if (typeof data === 'object' && !(data instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      if (value !== undefined) {
+        cleaned[key] = cleanForFirestore(value);
+      }
+    }
+    return cleaned;
+  }
+  return data;
+}
+
 // Test connection on startup as requested by Firebase Integration Skill
 export async function testFirestoreConnection(): Promise<boolean> {
   if (!db) return false;
@@ -71,26 +95,79 @@ export async function testFirestoreConnection(): Promise<boolean> {
   }
 }
 
-// Save single category to Firestore
-export async function saveCategoryToFirestore(category: Category): Promise<void> {
-  if (!db) return;
-  const path = `categories/${category.id}`;
+// Fetch categories once from Firestore
+export async function getCategoriesOnce(): Promise<Category[] | null> {
+  if (!db) return null;
   try {
-    await setDoc(doc(db, 'categories', category.id), category, { merge: true });
+    const colRef = collection(db, 'categories');
+    const snapshot = await getDocs(colRef);
+    if (snapshot.empty) return null;
+
+    const loadedCategories: Category[] = [];
+    snapshot.forEach((docSnap) => {
+      loadedCategories.push(docSnap.data() as Category);
+    });
+    loadedCategories.sort((a, b) => (a.order || 0) - (b.order || 0));
+    return loadedCategories;
   } catch (err) {
-    handleFirestoreError(err, OperationType.WRITE, path);
+    handleFirestoreError(err, OperationType.LIST, 'categories');
+    return null;
   }
 }
 
-// Batch save multiple categories to Firestore
-export async function saveAllCategoriesToFirestore(categories: Category[]): Promise<void> {
-  if (!db || !Array.isArray(categories)) return;
+// Save single category to Firestore
+export async function saveCategoryToFirestore(category: Category): Promise<boolean> {
+  if (!db) return false;
+  const path = `categories/${category.id}`;
   try {
+    const cleaned = cleanForFirestore(category);
+    await setDoc(doc(db, 'categories', category.id), cleaned, { merge: true });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+    return false;
+  }
+}
+
+// Delete a category from Firestore
+export async function deleteCategoryFromFirestore(categoryId: string): Promise<boolean> {
+  if (!db) return false;
+  const path = `categories/${categoryId}`;
+  try {
+    await deleteDoc(doc(db, 'categories', categoryId));
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, path);
+    return false;
+  }
+}
+
+// Batch save multiple categories to Firestore (and clean up removed ones)
+export async function saveAllCategoriesToFirestore(categories: Category[]): Promise<boolean> {
+  if (!db || !Array.isArray(categories)) return false;
+  try {
+    // 1. Save current categories with clean data
     for (const cat of categories) {
-      await setDoc(doc(db, 'categories', cat.id), cat, { merge: true });
+      if (!cat.id) continue;
+      const cleaned = cleanForFirestore(cat);
+      await setDoc(doc(db, 'categories', cat.id), cleaned, { merge: true });
     }
+
+    // 2. Check if any category was deleted from Firestore
+    try {
+      const activeIds = new Set(categories.map((c) => c.id));
+      const existingSnap = await getDocs(collection(db, 'categories'));
+      for (const docSnap of existingSnap.docs) {
+        if (!activeIds.has(docSnap.id)) {
+          await deleteDoc(docSnap.ref);
+        }
+      }
+    } catch {}
+
+    return true;
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, 'categories');
+    return false;
   }
 }
 
@@ -126,7 +203,8 @@ export async function saveCommunityNominationToFirestore(nomination: CommunityNo
   if (!db) return;
   const path = `community_nominations/${nomination.id}`;
   try {
-    await setDoc(doc(db, 'community_nominations', nomination.id), nomination, { merge: true });
+    const cleaned = cleanForFirestore(nomination);
+    await setDoc(doc(db, 'community_nominations', nomination.id), cleaned, { merge: true });
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, path);
   }
@@ -163,7 +241,8 @@ export async function saveSettingsToFirestore(settings: CeremonySettings): Promi
   if (!db) return;
   const path = 'settings/global';
   try {
-    await setDoc(doc(db, 'settings', 'global'), settings, { merge: true });
+    const cleaned = cleanForFirestore(settings);
+    await setDoc(doc(db, 'settings', 'global'), cleaned, { merge: true });
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, path);
   }

@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Category, 
   Nominee, 
   CeremonySettings, 
   CeremonySegment, 
   LiveChatMessage, 
-  CommunityNomination,
+  CommunityNomination, 
   PKXDUserAccount,
   isAuthorizedAdminEmail
 } from './types';
@@ -35,7 +35,8 @@ import {
   saveAllCategoriesToFirestore, 
   subscribeCategories, 
   saveCommunityNominationToFirestore, 
-  subscribeCommunityNominations 
+  subscribeCommunityNominations,
+  getCategoriesOnce
 } from './lib/firestoreService';
 
 export default function App() {
@@ -234,6 +235,9 @@ export default function App() {
     category: Category;
   } | null>(null);
 
+  // Track whether categories have been loaded from Firestore to prevent mount wiping
+  const isCloudSyncedRef = useRef<boolean>(false);
+
   // 1. Startup Recovery: Load from IndexedDB (recovering data if localStorage was limited or reset)
   useEffect(() => {
     async function loadPersistentData() {
@@ -241,6 +245,8 @@ export default function App() {
         const savedCats = await getItemPersistent<Category[]>('xma_categories_2026_v7', []);
         if (Array.isArray(savedCats) && savedCats.length > 0) {
           setCategories((current) => {
+            // Do not override if already hydrated from cloud Firestore
+            if (isCloudSyncedRef.current) return current;
             const currentNomineeCount = current.reduce((acc, c) => acc + (c.nominees?.length || 0), 0);
             const savedNomineeCount = savedCats.reduce((acc, c) => acc + (c.nominees?.length || 0), 0);
             if (savedNomineeCount >= currentNomineeCount) {
@@ -271,9 +277,34 @@ export default function App() {
 
   // 2. Real-time Cloud Sync with Firestore
   useEffect(() => {
-    testFirestoreConnection();
+    let isMounted = true;
+
+    async function initCloudCategories() {
+      try {
+        await testFirestoreConnection();
+        const cloudCats = await getCategoriesOnce();
+        if (isMounted && cloudCats && cloudCats.length > 0) {
+          const sanitized = cloudCats.map((c) => ({
+            ...c,
+            nominees: sanitizeNominees(c.nominees || [])
+          }));
+          setCategories(sanitized);
+          setItemPersistent('xma_categories_2026_v7', sanitized);
+          isCloudSyncedRef.current = true;
+        } else if (isMounted && (!cloudCats || cloudCats.length === 0)) {
+          // If Firestore is brand new and completely empty, seed it with the official categories
+          await saveAllCategoriesToFirestore(INITIAL_CATEGORIES);
+          isCloudSyncedRef.current = true;
+        }
+      } catch (err) {
+        console.error('Erro ao inicializar categorias do Firestore:', err);
+      }
+    }
+
+    initCloudCategories();
 
     const unsubCategories = subscribeCategories((cloudCategories) => {
+      if (!isMounted) return;
       if (Array.isArray(cloudCategories) && cloudCategories.length > 0) {
         const sanitized = cloudCategories.map((c) => ({
           ...c,
@@ -281,10 +312,12 @@ export default function App() {
         }));
         setCategories(sanitized);
         setItemPersistent('xma_categories_2026_v7', sanitized);
+        isCloudSyncedRef.current = true;
       }
     });
 
     const unsubNominations = subscribeCommunityNominations((cloudNominations) => {
+      if (!isMounted) return;
       if (Array.isArray(cloudNominations) && cloudNominations.length > 0) {
         setCommunityNominations(cloudNominations);
         setItemPersistent('xma_community_nominations_2026_v7', cloudNominations);
@@ -292,6 +325,7 @@ export default function App() {
     });
 
     return () => {
+      isMounted = false;
       unsubCategories();
       unsubNominations();
     };
@@ -300,7 +334,11 @@ export default function App() {
   // 3. Persistence Effects (Dual-layer IndexedDB + localStorage + Firestore)
   useEffect(() => {
     setItemPersistent('xma_categories_2026_v7', categories);
-    saveAllCategoriesToFirestore(categories);
+    // CRITICAL: Only write back to Firestore if initial cloud data has already been loaded!
+    // This stops empty or uninitialized local state on mount from wiping out saved Firestore data upon refresh!
+    if (isCloudSyncedRef.current) {
+      saveAllCategoriesToFirestore(categories);
+    }
   }, [categories]);
 
   useEffect(() => {

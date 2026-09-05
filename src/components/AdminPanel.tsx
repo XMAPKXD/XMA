@@ -55,6 +55,12 @@ import { signInWithGoogle } from '../lib/firebase';
 import { compressImage, compressDataUrl } from '../utils/imageCompressor';
 import { AdminVotingStats } from './AdminVotingStats';
 import { BulkNomineeImporter } from './BulkNomineeImporter';
+import { 
+  saveCategoryToFirestore, 
+  deleteCategoryFromFirestore, 
+  saveAllCategoriesToFirestore, 
+  saveSettingsToFirestore 
+} from '../lib/firestoreService';
 
 interface AdminPanelProps {
   categories: Category[];
@@ -218,6 +224,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [chatAnnouncementInput, setChatAnnouncementInput] = useState<string>('');
   const [newPasswordInput, setNewPasswordInput] = useState<string>('');
 
+  // Firestore Sync Feedback Status
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'synced' | 'error'>('idle');
+
+  const syncToCloud = async (cats: Category[]) => {
+    try {
+      setSyncStatus('saving');
+      await saveAllCategoriesToFirestore(cats);
+      setSyncStatus('synced');
+      setTimeout(() => {
+        setSyncStatus('idle');
+      }, 4000);
+    } catch (err) {
+      console.error('Erro ao sincronizar categorias com Firestore:', err);
+      setSyncStatus('error');
+    }
+  };
+
   // Google Admin Sign-in Handler
   const handleGoogleAdminSignIn = async () => {
     try {
@@ -317,6 +340,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         };
       });
       onUpdateCategories(updated);
+      syncToCloud(updated);
       setEditingNomineeId(null);
     } else {
       // Create new (starts with 0 votes)
@@ -348,6 +372,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         return cat;
       });
       onUpdateCategories(updated);
+      syncToCloud(updated);
       setIsAddingNominee(false);
     }
 
@@ -384,6 +409,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return cat;
     });
     onUpdateCategories(updated);
+    syncToCloud(updated);
   };
 
   // Save Category
@@ -405,6 +431,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         return c;
       });
       onUpdateCategories(updated);
+      syncToCloud(updated);
       setEditingCategoryId(null);
     } else {
       const newCategory: Category = {
@@ -418,7 +445,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         sponsor: categoryForm.sponsor,
         nominees: []
       };
-      onUpdateCategories([...categories, newCategory]);
+      const updated = [...categories, newCategory];
+      onUpdateCategories(updated);
+      syncToCloud(updated);
       setIsAddingCategory(false);
     }
 
@@ -434,13 +463,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Delete Category
   const handleDeleteCategory = (categoryId: string) => {
     if (!confirm('Deseja realmente excluir esta categoria e todos os seus indicados?')) return;
-    onUpdateCategories(categories.filter((c) => c.id !== categoryId));
+    const remaining = categories.filter((c) => c.id !== categoryId);
+    onUpdateCategories(remaining);
+    deleteCategoryFromFirestore(categoryId);
+    syncToCloud(remaining);
   };
 
   // Set All Categories Status
   const handleSetAllCategoriesStatus = (status: Category['status']) => {
     const updated = categories.map((c) => ({ ...c, status }));
     onUpdateCategories(updated);
+    syncToCloud(updated);
   };
 
   // Zero out all votes across all nominees
@@ -456,6 +489,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }))
     }));
     onUpdateCategories(updated);
+    syncToCloud(updated);
   };
 
   // Approve Community Nomination & turn into official nominee
@@ -495,6 +529,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     });
 
     onUpdateCategories(updatedCategories);
+    syncToCloud(updatedCategories);
 
     // 2. Mark submission as approved
     const updatedSubmissions = communityNominations.map((n) => {
@@ -565,6 +600,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     });
 
     onUpdateCategories(updatedCategories);
+    syncToCloud(updatedCategories);
 
     const updatedCommunity = communityNominations.map((n) => {
       if (pending.some((p) => p.id === n.id)) {
@@ -600,6 +636,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return cat;
     });
     onUpdateCategories(updated);
+    syncToCloud(updated);
 
     if (status === 'winner_revealed') {
       playFanfare();
@@ -785,6 +822,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <span>{userAccount.email}</span>
                 </div>
               )}
+              {/* Firestore Real-Time Sync Indicator */}
+              {syncStatus === 'saving' && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 border border-amber-400/50 text-amber-300 animate-pulse">
+                  <Sparkles className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                  <span>Salvando no Firestore...</span>
+                </div>
+              )}
+              {syncStatus === 'synced' && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 border border-emerald-400/50 text-emerald-300">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Salvo no Firestore! ☁️</span>
+                </div>
+              )}
+              {syncStatus === 'error' && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 border border-red-400/50 text-red-300">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                  <span>Erro ao sincronizar</span>
+                </div>
+              )}
             </div>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-white font-cinzel">
               Painel <span className="text-gold-metallic">Admins XMA</span>
@@ -864,6 +920,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             onClose={() => setIsBulkImporterOpen(false)}
             onImportSuccess={(count, updatedCats) => {
               onUpdateCategories(updatedCats);
+              syncToCloud(updatedCats);
               setBulkSuccessMessage(`🎉 Sucesso! ${count} indicados foram adicionados em massa e sincronizados com sucesso no XMA 2026.`);
               setTimeout(() => setBulkSuccessMessage(null), 8000);
             }}
