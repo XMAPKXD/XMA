@@ -522,7 +522,7 @@ export default function App() {
         return {
           ...cat,
           status: 'winner_revealed' as const,
-          winnerNomineeId: sorted[0]?.id
+          winnerNomineeId: sorted[0]?.id || null
         };
       }
       return cat;

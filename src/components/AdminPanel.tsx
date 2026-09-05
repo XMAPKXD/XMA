@@ -622,15 +622,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleSetCategoryStatus = (categoryId: string, status: Category['status']) => {
     const updated = categories.map((cat) => {
       if (cat.id === categoryId) {
-        let winnerId = cat.winnerNomineeId;
+        let winnerId = cat.winnerNomineeId || null;
         if (status === 'winner_revealed' && !winnerId) {
           const sorted = [...cat.nominees].sort((a, b) => b.votes - a.votes);
-          winnerId = sorted[0]?.id;
+          winnerId = sorted[0]?.id || null;
         }
         return {
           ...cat,
           status,
-          winnerNomineeId: winnerId
+          winnerNomineeId: winnerId || null
         };
       }
       return cat;
@@ -653,12 +653,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         return {
           ...cat,
           status: 'winner_revealed' as const,
-          winnerNomineeId: nomineeId
+          winnerNomineeId: nomineeId || null
         };
       }
       return cat;
     });
     onUpdateCategories(updated);
+    syncToCloud(updated);
   };
 
   const handleUpdateTicker = (e: React.FormEvent) => {
