@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Category, 
   Nominee, 
@@ -6,7 +6,8 @@ import {
   CeremonySegment, 
   LiveChatMessage, 
   CommunityNomination,
-  PKXDUserAccount 
+  PKXDUserAccount,
+  isAuthorizedAdminEmail
 } from './types';
 import { 
   INITIAL_CATEGORIES, 
@@ -15,6 +16,7 @@ import {
   INITIAL_CHAT_MESSAGES,
   INITIAL_COMMUNITY_NOMINATIONS 
 } from './data/initialData';
+import { Trophy } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { GoldenTicker } from './components/GoldenTicker';
 import { NomineesGallery } from './components/NomineesGallery';
@@ -40,16 +42,38 @@ export default function App() {
   // Navigation
   const [activeTab, setActiveTab] = useState<'gallery' | 'voting' | 'community_nominations' | 'ceremony' | 'admin'>('gallery');
 
-  // Site Countdown / Teaser State (Default to true: everyone stays on countdown until admin unlocks)
-  const [isCountdownActive, setIsCountdownActive] = useState<boolean>(() => {
-    try {
-      const isAdminSession = sessionStorage.getItem('xma_admin_session_unlocked') === 'true';
-      if (isAdminSession) return false;
-      const saved = localStorage.getItem('xma_countdown_active_v8');
-      return saved !== null ? saved === 'true' : true; // Default to true (locked on countdown timer)
-    } catch {
-      return true;
+  // Load Ceremony Settings
+  const [settings, setSettings] = useState<CeremonySettings>(() => {
+    return getItemPersistent('xma_ceremony_settings_v8', INITIAL_CEREMONY_SETTINGS);
+  });
+
+  // Target timestamp: 15 de Setembro de 2026 às 19:00:00 (GMT-3 Brasília)
+  const countdownTargetTimestamp = useMemo(() => {
+    if (settings?.countdownTargetIso) {
+      const parsed = new Date(settings.countdownTargetIso).getTime();
+      if (!isNaN(parsed)) return parsed;
     }
+    // Month index 8 is September in JavaScript Date
+    return new Date(2026, 8, 15, 19, 0, 0).getTime();
+  }, [settings?.countdownTargetIso]);
+
+  // Is the countdown currently finished?
+  const [isCountdownFinished, setIsCountdownFinished] = useState<boolean>(() => {
+    return Date.now() >= countdownTargetTimestamp;
+  });
+
+  // Site Countdown / Teaser State
+  // STRICT USER RULE: "Até a contagem regressiva acabar, só admins acessam o site! Depois da contagem qualquer pessoa"
+  const [isCountdownActive, setIsCountdownActive] = useState<boolean>(() => {
+    const finished = Date.now() >= countdownTargetTimestamp;
+    if (finished) {
+      return false; // Anyone can access after countdown!
+    }
+    try {
+      const adminUnlocked = sessionStorage.getItem('xma_admin_session_unlocked') === 'true';
+      if (adminUnlocked) return false; // Admin can access
+    } catch {}
+    return true; // Locked for non-admins until countdown ends!
   });
 
   // Filter out any leftover hardcoded mock IDs from earlier versions
@@ -82,16 +106,6 @@ export default function App() {
       return INITIAL_CATEGORIES;
     } catch {
       return INITIAL_CATEGORIES;
-    }
-  });
-
-  // Settings
-  const [settings, setSettings] = useState<CeremonySettings>(() => {
-    try {
-      const saved = localStorage.getItem('xma_settings_2026_v7');
-      return saved ? JSON.parse(saved) : INITIAL_CEREMONY_SETTINGS;
-    } catch {
-      return INITIAL_CEREMONY_SETTINGS;
     }
   });
 
@@ -146,6 +160,62 @@ export default function App() {
       };
     }
   });
+
+  // Check if current user or active session has admin privileges
+  const isUserAdmin = useMemo(() => {
+    try {
+      if (userAccount?.email && isAuthorizedAdminEmail(userAccount.email)) return true;
+      if (sessionStorage.getItem('xma_admin_session_unlocked') === 'true') return true;
+    } catch {}
+    return false;
+  }, [userAccount?.email]);
+
+  // Real-time verification: enforce that only admins can access the site before countdown ends
+  // "Até a contagem regressiva acabar, só admins acessam o site! Depois da contagem qualquer pessoa"
+  useEffect(() => {
+    const checkCountdownAccess = () => {
+      const now = Date.now();
+      const finished = now >= countdownTargetTimestamp;
+      if (finished) {
+        setIsCountdownFinished(true);
+      } else {
+        // Countdown is active: check if user is admin
+        let adminUnlocked = false;
+        try {
+          adminUnlocked = sessionStorage.getItem('xma_admin_session_unlocked') === 'true' ||
+            (!!userAccount?.email && isAuthorizedAdminEmail(userAccount.email));
+        } catch {}
+
+        if (!adminUnlocked) {
+          setIsCountdownActive(true);
+        }
+      }
+    };
+
+    checkCountdownAccess();
+    const interval = setInterval(checkCountdownAccess, 1000);
+    return () => clearInterval(interval);
+  }, [countdownTargetTimestamp, userAccount?.email]);
+
+  const handleReveal = () => {
+    const finished = Date.now() >= countdownTargetTimestamp;
+    let adminUnlocked = false;
+    try {
+      adminUnlocked = sessionStorage.getItem('xma_admin_session_unlocked') === 'true' ||
+        (!!userAccount?.email && isAuthorizedAdminEmail(userAccount.email));
+    } catch {}
+
+    // Before countdown ends, only admins can enter the site!
+    if (!finished && !adminUnlocked) {
+      alert('Acesso Restrito: Até a contagem regressiva acabar, apenas administradores autorizados têm acesso à plataforma.');
+      return;
+    }
+
+    try {
+      localStorage.setItem('xma_countdown_active_v8', 'false');
+    } catch {}
+    setIsCountdownActive(false);
+  };
 
   // General vote history tracking
   const [userVotes, setUserVotes] = useState<Record<string, string>>(() => {
@@ -452,7 +522,11 @@ export default function App() {
           onLikeNomination={handleLikeNomination}
           userNickname={userAccount.nickname}
           userPkxdTag={userAccount.pkxdTag}
+          targetDate={new Date(countdownTargetTimestamp)}
           onAdminUnlock={(adminUser) => {
+            try {
+              sessionStorage.setItem('xma_admin_session_unlocked', 'true');
+            } catch {}
             setUserAccount({
               isLoggedIn: true,
               nickname: adminUser.name,
@@ -464,17 +538,7 @@ export default function App() {
             setIsCountdownActive(false);
             setActiveTab('admin');
           }}
-          onReveal={() => {
-            // Check if user is admin before unlocking
-            try {
-              const isAdminSession = sessionStorage.getItem('xma_admin_session_unlocked') === 'true';
-              if (isAdminSession) {
-                setIsCountdownActive(false);
-              }
-            } catch {
-              setIsCountdownActive(false);
-            }
-          }}
+          onReveal={handleReveal}
         />
       )}
 
@@ -499,7 +563,7 @@ export default function App() {
             userVotes={userVotes}
             onVote={(catId, nomId) => handleMassVote(catId, nomId, 1)}
             onSelectNominee={(nominee, category) => setSelectedNomineeModal({ nominee, category })}
-            onSwitchToCeremony={() => setActiveTab('voting')}
+            onSwitchToCeremony={() => setActiveTab('ceremony')}
             onSwitchToAdmin={() => setActiveTab('admin')}
           />
         )}
@@ -587,17 +651,67 @@ export default function App() {
         onLogout={handleLogout}
       />
 
-      {/* Footer */}
-      <footer className="mt-auto border-t border-amber-500/20 bg-[#07070b] py-8 text-center text-xs text-zinc-500">
-        <div className="max-w-7xl mx-auto px-4 space-y-2">
-          <div className="flex items-center justify-center gap-2 text-amber-400/80 font-cinzel font-bold text-sm">
-            <span>XMA 2026</span>
-            <span>•</span>
-            <span>PK XD Music & Media Awards</span>
+      {/* Refined Luxury Footer */}
+      <footer className="mt-auto border-t border-amber-500/20 bg-[#06070a] py-10 text-xs text-zinc-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-6 border-b border-zinc-900">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 to-amber-600 p-[1px]">
+                <div className="w-full h-full bg-[#0b0c13] rounded-[11px] flex items-center justify-center">
+                  <Trophy className="w-4 h-4 text-amber-400" />
+                </div>
+              </div>
+              <div className="text-left">
+                <span className="text-white font-cinzel font-black tracking-wider text-sm block">
+                  XMA 2026
+                </span>
+                <span className="text-[10px] text-zinc-400">
+                  PK XD Music & Media Awards
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6 text-xs text-zinc-400">
+              <button 
+                onClick={() => setActiveTab('gallery')} 
+                className="hover:text-amber-300 transition-colors cursor-pointer"
+              >
+                Galeria de Indicados
+              </button>
+              <button 
+                onClick={() => setActiveTab('voting')} 
+                className="hover:text-amber-300 transition-colors cursor-pointer"
+              >
+                Urna de Votação
+              </button>
+              <button 
+                onClick={() => setActiveTab('ceremony')} 
+                className="hover:text-amber-300 transition-colors cursor-pointer"
+              >
+                Palco da Cerimônia
+              </button>
+              <button 
+                onClick={() => setActiveTab('admin')} 
+                className="hover:text-amber-300 transition-colors cursor-pointer"
+              >
+                Painel Admin
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 text-[11px] font-mono text-amber-400/90 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span>Edição Oficial 2026</span>
+            </div>
           </div>
-          <p className="text-zinc-500">
-            Paleta Oficial Dourado, Preto e Prata Metálico • Voto em Massa e Voto Único Oficial com Login PK XD
-          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-zinc-500 text-[11px]">
+            <p>
+              XMA 2026 • Plataforma de Premiação Oficial da Comunidade de Criadores e Fãs de PK XD.
+            </p>
+            <p className="text-zinc-600">
+              Design Dourado Metálico & Obsidian Luxury
+            </p>
+          </div>
         </div>
       </footer>
     </div>

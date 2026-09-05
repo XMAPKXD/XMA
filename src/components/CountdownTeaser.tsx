@@ -5,6 +5,8 @@ import {
   VolumeX,
   Sparkles,
   Trophy,
+  Crown,
+  LogIn,
   Play,
   Pause,
   ChevronLeft,
@@ -260,6 +262,9 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
     }, 6000);
   };
 
+  // Simulated countdown completion for Admin testing
+  const [simulatedEnd, setSimulatedEnd] = useState<boolean>(false);
+
   // Admin Modal & State
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [adminError, setAdminError] = useState<string | null>(null);
@@ -272,12 +277,15 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
       const googleUser = await signInWithGoogle();
       if (!googleUser || !googleUser.email) {
         setAdminError('Nenhum e-mail retornado pelo login do Google.');
+        setIsAdminModalOpen(true);
         return;
       }
 
-      if (isAuthorizedAdminEmail(googleUser.email)) {
+      const email = googleUser.email.toLowerCase().trim();
+      if (isAuthorizedAdminEmail(email)) {
         try {
           sessionStorage.setItem('xma_admin_session_unlocked', 'true');
+          localStorage.setItem('xma_countdown_active_v8', 'false');
           setIsAdminUnlocked(true);
           playFanfare();
           playAdminGavel();
@@ -293,15 +301,42 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
           });
         }
         setIsAdminModalOpen(false);
+        onReveal();
       } else {
-        setAdminError(`Acesso negado. O e-mail (${googleUser.email}) não é um Administrador autorizado.`);
+        setAdminError(`Acesso antecipado exclusivo para administradores. A conta (${googleUser.email}) foi conectada com sucesso, mas a plataforma só abrirá para o público geral após a contagem regressiva em 15 de Setembro às 19:00.`);
+        setIsAdminModalOpen(true);
       }
     } catch (err: any) {
       console.error('Google admin login error:', err);
-      setAdminError('Falha no login do Google.');
+      setAdminError('Falha ao autenticar com o Google. Verifique a janela de login.');
+      setIsAdminModalOpen(true);
     } finally {
       setIsGoogleLoading(false);
     }
+  };
+
+  // User requested: "Ao clicar em entrar na plataforma ou só admins redireciona pra fazer login com google"
+  const handleEnterPlatformClick = () => {
+    // If countdown finished or simulated end, enter directly!
+    if (timeLeft.total <= 0 || simulatedEnd) {
+      try {
+        localStorage.setItem('xma_countdown_active_v8', 'false');
+      } catch {}
+      onReveal();
+      return;
+    }
+
+    // If admin is already unlocked, enter directly!
+    if (isAdminUnlocked) {
+      try {
+        localStorage.setItem('xma_countdown_active_v8', 'false');
+      } catch {}
+      onReveal();
+      return;
+    }
+
+    // Redirect to Google login
+    handleGoogleAdminLogin();
   };
 
   const handleAdminLogout = () => {
@@ -570,6 +605,11 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
     if (viewMode !== 'teaser') return;
 
     const calculateTime = () => {
+      if (simulatedEnd) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, total: 0 });
+        return;
+      }
+
       const now = Date.now();
       const diff = targetTimestamp - now;
       if (diff <= 0) {
@@ -596,7 +636,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
     const interval = setInterval(calculateTime, 1000);
 
     return () => clearInterval(interval);
-  }, [targetTimestamp, isMuted, hasInteracted, viewMode]);
+  }, [targetTimestamp, isMuted, hasInteracted, viewMode, simulatedEnd]);
 
   const handleUserInteract = () => {
     if (!hasInteracted) {
@@ -615,6 +655,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
 
   const formatUnit = (num: number) => String(num).padStart(2, '0');
   const currentSlideData = presentationSlides[currentSlide];
+  const isCountdownFinished = timeLeft.total <= 0;
 
   return (
     <div
@@ -669,18 +710,62 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
               </button>
             )}
 
-            {/* Admin Access / Status Button */}
+            {/* Enter Platform Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEnterPlatformClick();
+              }}
+              disabled={isGoogleLoading}
+              className={`px-3.5 sm:px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 ${
+                isCountdownFinished || isAdminUnlocked
+                  ? 'bg-gold-metallic-btn text-black shadow-amber-500/30'
+                  : 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-black shadow-amber-500/20'
+              }`}
+              title={
+                isCountdownFinished
+                  ? 'A contagem acabou! Entrar na arena oficial do XMA 2026'
+                  : isAdminUnlocked
+                  ? 'Acessar o site oficial (Admin Autenticado)'
+                  : 'Clique para entrar na plataforma com login Google'
+              }
+            >
+              {isGoogleLoading ? (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-black animate-spin" />
+                  <span>Conectando...</span>
+                </>
+              ) : isCountdownFinished ? (
+                <>
+                  <Trophy className="w-3.5 h-3.5" />
+                  <span>Entrar na Plataforma 🏆</span>
+                </>
+              ) : isAdminUnlocked ? (
+                <>
+                  <Crown className="w-3.5 h-3.5" />
+                  <span>Entrar na Plataforma (Admin) 🔓</span>
+                </>
+              ) : (
+                <>
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Entrar na Plataforma</span>
+                </>
+              )}
+            </button>
+
+            {/* Só Admins (Google Login) */}
             {!isAdminUnlocked ? (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsAdminModalOpen(true);
+                  handleGoogleAdminLogin();
                 }}
-                className="px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-amber-500/20 hover:from-amber-500/40 hover:to-amber-400/40 text-amber-200 border border-amber-400/50 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-lg backdrop-blur-md hover:scale-105 active:scale-95"
-                title="Acesso exclusivo para administradores e organizadores"
+                disabled={isGoogleLoading}
+                className="px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-amber-500/20 hover:from-amber-500/40 hover:to-amber-400/40 text-amber-200 border border-amber-400/50 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-lg backdrop-blur-md hover:scale-105 active:scale-95 disabled:opacity-50"
+                title="Acesso exclusivo para administradores com login Google"
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
-                <span>Acesso Admin 🔐</span>
+                <span>Só Admins (Google) 🔐</span>
               </button>
             ) : (
               <div className="flex items-center gap-1.5">
@@ -725,28 +810,45 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  triggerRevealSequence();
+                  setSimulatedEnd(!simulatedEnd);
+                  if (!simulatedEnd) {
+                    triggerRevealSequence();
+                  }
                 }}
-                className="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-black text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/30 hover:scale-105 active:scale-95 cursor-pointer"
-                title="Executar simulação da animação épica de entrada"
+                className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 text-xs font-bold transition-all shadow-sm cursor-pointer"
+                title={simulatedEnd ? "Restaurar contagem real de 15 de Setembro" : "Simular fim do cronômetro para testar liberação pública"}
               >
-                <Play className="w-3.5 h-3.5 text-black fill-black" />
-                <span>Simular Animação de Entrada 🎬</span>
+                {simulatedEnd ? "⏰ Restaurar Contagem Oficial" : "⚡ Simular Fim da Contagem (Liberar p/ Todos)"}
               </button>
 
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  triggerRevealSequence();
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-black text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/30 hover:scale-105 active:scale-95 cursor-pointer"
+                title="Executar simulação da animação épica de entrada"
+              >
+                <Play className="w-3.5 h-3.5 text-black fill-black" />
+                <span>Simular Abertura 🎬</span>
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  try {
+                    localStorage.setItem('xma_countdown_active_v8', 'false');
+                  } catch {}
                   onReveal();
                 }}
-                className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-amber-400/50 text-amber-300 hover:text-amber-200 text-xs font-bold transition-all shadow-sm cursor-pointer"
-                title="Ir diretamente para a arena oficial sem contagem"
+                className="px-3.5 py-1.5 rounded-xl bg-gold-metallic-btn text-black text-xs font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer hover:scale-105 active:scale-95"
+                title="Acessar o site oficial e a arena como Administrador"
               >
-                Entrar no Site 🔓
+                Entrar no Site (Admin) 🔓
               </button>
             </div>
           </motion.div>
@@ -790,7 +892,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1, delay: 0.5 }}
-            className="space-y-1.5 mt-2 mb-6 sm:mb-10 px-2"
+            className="space-y-2 mt-2 mb-6 sm:mb-10 px-2 max-w-2xl mx-auto"
           >
             <p className="text-[11px] sm:text-base font-semibold uppercase tracking-[0.25em] sm:tracking-[0.4em] text-amber-300/90 font-mono">
               PK XD Music & Media Awards 2026
@@ -798,6 +900,12 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
             <p className="text-[11px] sm:text-sm text-zinc-400 font-medium">
               Grande Estreia Mundial: <strong className="text-amber-300">15 de Setembro às 19:00 (Horário Oficial de Brasília)</strong>
             </p>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-400/30 text-amber-300 text-[10px] sm:text-xs font-mono shadow-sm">
+              <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>
+                Até a contagem acabar: <strong className="text-white">Apenas Admins</strong>. Após o fim da contagem: <strong className="text-amber-300">Liberado para qualquer pessoa!</strong>
+              </span>
+            </div>
           </motion.div>
 
           {/* Countdown Clock Grid */}
@@ -858,7 +966,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
           </motion.div>
 
           {!hasInteracted && (
-            <p className="text-[11px] text-amber-400/80 mt-4 mb-6 animate-bounce flex items-center gap-1.5">
+            <p className="text-[11px] text-amber-400/80 mt-6 mb-4 animate-bounce flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
               Clique na tela para ativar o som mecânico de Tic-Tac
             </p>
@@ -1846,14 +1954,14 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
               )}
 
               {/* Exclusive Admin Google Login */}
-              <div className="space-y-3">
+              <div className="space-y-4 pt-2">
                 <button
                   type="button"
                   onClick={handleGoogleAdminLogin}
                   disabled={isGoogleLoading}
-                  className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all shadow-md cursor-pointer hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                  className="w-full py-4 px-4 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-900 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-3 transition-all shadow-xl cursor-pointer hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
                     <path
                       fill="#4285F4"
                       d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
@@ -1871,12 +1979,17 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                       d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
                     />
                   </svg>
-                  <span>{isGoogleLoading ? 'Verificando Conta Google...' : 'Entrar com Google Oficial Admin'}</span>
+                  <span>{isGoogleLoading ? 'Verificando Conta Google...' : 'Entrar com Conta Google Autorizada'}</span>
                 </button>
 
-                <p className="text-[11px] text-zinc-500 text-center">
-                  Permitido apenas para e-mails cadastrados na lista oficial de Administradores.
-                </p>
+                <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400 space-y-1 text-center leading-relaxed">
+                  <p>
+                    Acesso exclusivo por autenticação OAuth oficial do Google.
+                  </p>
+                  <p className="text-zinc-500 font-mono text-[10px]">
+                    Contas autorizadas: <span className="text-amber-300">kawanyuri35@gmail.com</span>, <span className="text-amber-300">eukoosh@gmail.com</span>
+                  </p>
+                </div>
               </div>
             </motion.div>
           </div>

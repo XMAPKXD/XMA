@@ -126,5 +126,6 @@ export interface CeremonySettings {
   coHostName: string;
   soundEffectsEnabled: boolean;
   communityNominationsOpen?: boolean;
+  countdownTargetIso?: string;
 }
 

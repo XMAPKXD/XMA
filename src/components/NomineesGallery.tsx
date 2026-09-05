@@ -1,7 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import { Category, Nominee } from '../types';
-import { Trophy, Search, Sparkles, CheckCircle2, Eye, Flame, Crown, Film, Music, Star, Youtube, Play, Image as ImageIcon, Volume2, X } from 'lucide-react';
-import { motion } from 'motion/react';
+import { 
+  Trophy, 
+  Search, 
+  Sparkles, 
+  CheckCircle2, 
+  Eye, 
+  Crown, 
+  Film, 
+  Music, 
+  Star, 
+  Youtube, 
+  Play, 
+  Image as ImageIcon, 
+  X,
+  Vote,
+  ArrowRight
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { getYouTubeEmbedUrl, getNomineeYouTubeUrl, getNomineeThumbnailUrl, isMusicCategory, isThumbnailCategory } from '../utils/media';
 
 interface NomineesGalleryProps {
@@ -23,7 +39,13 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
 }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [playingMusicNomineeId, setPlayingMusicNomineeId] = useState<string | null>(null);
+  
+  // Dedicated Theater Player Modal (keeps cards pristine and avoids layout jumping)
+  const [theaterMedia, setTheaterMedia] = useState<{
+    title: string;
+    embedUrl: string;
+    nomineeName: string;
+  } | null>(null);
 
   const filteredCategories = useMemo(() => {
     return categories
@@ -52,92 +74,103 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
 
   return (
     <div className="space-y-10 pb-16">
-      {/* Header Banner */}
-      <div className="relative rounded-3xl bg-gradient-to-br from-[#181924] via-[#101117] to-[#0a0a0d] border border-amber-500/30 p-6 sm:p-10 overflow-hidden shadow-2xl">
+      {/* Luxury Gala Pavilion Header */}
+      <div className="relative rounded-3xl bg-gradient-to-br from-[#12131b] via-[#0d0e14] to-[#07080c] border border-amber-500/30 p-6 sm:p-10 overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-slate-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-amber-400/5 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/15 border border-amber-400/40 text-amber-300">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Galeria Oficial de Indicados 2026</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/15 border border-amber-400/40 text-amber-300 font-mono shadow-sm">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Pavilhão Oficial de Indicados • XMA 2026</span>
             </div>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight font-cinzel">
-              Estrelas do <span className="text-gold-metallic">Multiverso PK XD</span>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight font-cinzel">
+              Galeria dos <span className="text-gold-metallic">Astros & Produções</span>
             </h1>
-            <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-              Explore os talentos e produções indicadas ao Troféu XMA. Todos os indicados oficiais são gerenciados diretamente pelo painel administrativo.
+            <p className="text-zinc-300 text-sm sm:text-base leading-relaxed">
+              Conheça todos os criadores de conteúdo, hits musicais, vídeos e thumbnails que estão concorrendo aos cobiçados troféus dourados da premiação oficial PK XD.
             </p>
           </div>
 
-          {/* Quick Stage Card */}
-          <div className="bg-[#151620]/90 border border-amber-500/30 rounded-2xl p-5 shrink-0 max-w-xs space-y-3 shadow-xl backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase font-bold text-amber-400">Total Indicados</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">
-                {totalNomineesCount} Astros
+          {/* Quick Stats & Ceremony Action */}
+          <div className="bg-[#151622]/90 border border-amber-500/30 rounded-2xl p-5 shrink-0 max-w-sm space-y-3 shadow-xl backdrop-blur-md">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-xs uppercase font-bold text-amber-400 font-mono">Quadro Oficial</span>
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold font-mono">
+                {totalNomineesCount} Astros Indicados
               </span>
             </div>
             <div className="text-2xl font-black font-cinzel text-white">
-              {categories.length} Categorias
+              {categories.length} Categorias em Disputa
             </div>
             <button
               onClick={onSwitchToCeremony}
-              className="w-full py-2 px-4 rounded-xl bg-gold-metallic-btn text-black font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl bg-gold-metallic-btn text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-amber-500/20 hover:scale-[1.02] active:scale-95 transition-all"
             >
               <Trophy className="w-4 h-4" />
-              <span>Assistir Cerimônia</span>
+              <span>Ver Palco da Cerimônia</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Filter & Search Bar */}
+        {/* Filter Ribbon & Instant Search */}
         <div className="mt-8 pt-6 border-t border-zinc-800/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           {/* Categories Horizontal Pills */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
             <button
               onClick={() => setSelectedCategoryId('all')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${
+              className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap cursor-pointer ${
                 selectedCategoryId === 'all'
-                  ? 'bg-amber-400 text-black shadow-md shadow-amber-400/20'
+                  ? 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-black shadow-md shadow-amber-500/25 font-black scale-105'
                   : 'bg-zinc-900/80 text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-800'
               }`}
             >
-              Todas as Categorias ({categories.length})
+              Todas ({categories.length})
             </button>
 
             {categories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategoryId(cat.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold tracking-wider transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                className={`px-4 py-2 rounded-full text-xs font-bold tracking-wider transition-all whitespace-nowrap flex items-center gap-2 border cursor-pointer ${
                   selectedCategoryId === cat.id
-                    ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-black shadow-md'
-                    : 'bg-zinc-900/80 text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-800'
+                    ? 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-black border-amber-300 shadow-md shadow-amber-500/25 font-black scale-105'
+                    : 'bg-zinc-900/80 text-zinc-300 hover:text-white hover:bg-zinc-800 border-zinc-800'
                 }`}
               >
                 <span>{cat.title}</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/40 text-zinc-300">
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  selectedCategoryId === cat.id ? 'bg-black/30 text-black' : 'bg-black/50 text-zinc-300'
+                }`}>
                   {cat.nominees.length}
                 </span>
                 {cat.status === 'winner_revealed' && (
-                  <Trophy className="w-3 h-3 text-amber-300" />
+                  <Trophy className="w-3 h-3 text-amber-500 fill-amber-500" />
                 )}
               </button>
             ))}
           </div>
 
           {/* Search Box */}
-          <div className="relative min-w-[240px]">
+          <div className="relative min-w-[260px]">
             <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar criador, #ID ou clipe..."
-              className="w-full pl-10 pr-4 py-2 bg-zinc-900/90 border border-zinc-700/80 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 transition-colors"
+              placeholder="Buscar astro, #ID ou obra..."
+              className="w-full pl-10 pr-8 py-2 bg-zinc-900/90 border border-zinc-700/80 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 transition-colors"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white p-1"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -155,11 +188,11 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
               id={`category-section-${category.id}`}
               className="space-y-6"
             >
-              {/* Category Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
+              {/* Category Header Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-amber-500/20">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-700 p-0.5 shadow-lg">
-                    <div className="w-full h-full bg-[#12131a] rounded-[10px] flex items-center justify-center text-amber-400">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-700 p-[1px] shadow-lg">
+                    <div className="w-full h-full bg-[#0e0f16] rounded-[10px] flex items-center justify-center text-amber-400">
                       {category.id.includes('hit') ? (
                         <Music className="w-5 h-5" />
                       ) : category.id.includes('clipe') ? (
@@ -178,47 +211,53 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
                         {category.title}
                       </h2>
                       {category.status === 'winner_revealed' ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-400 text-black flex items-center gap-1 shadow-sm">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-400 text-black shadow-md flex items-center gap-1">
                           <Trophy className="w-3 h-3" />
                           Vencedor Revelado
                         </span>
                       ) : category.status === 'voting_open' ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/20 border border-emerald-400/40 text-emerald-300">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center gap-1">
+                          <Vote className="w-3 h-3" />
                           Votação Aberta
                         </span>
                       ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/20 border border-amber-400/40 text-amber-300">
-                          Indicados Oficiais • Votação em Breve
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/15 border border-amber-500/30 text-amber-300">
+                          Indicados Oficiais
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-zinc-400 mt-0.5">
-                      {category.subtitle}
-                    </p>
+                    {category.subtitle && (
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        {category.subtitle}
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="text-xs text-zinc-400 flex items-center gap-2 self-start sm:self-auto">
-                  <Flame className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{category.status === 'voting_open' ? 'Total da Categoria:' : 'Status da Urna:'}</span>
-                  <strong className="text-amber-300 font-bold">
-                    {category.status === 'voting_open' 
-                      ? `${totalCatVotes.toLocaleString('pt-BR')} votos` 
-                      : 'Apresentação de Indicados'}
-                  </strong>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <span className="text-[11px] font-medium text-zinc-400 block">
+                      {category.status === 'voting_open' ? 'Total Votos Apurados' : 'Concorrentes'}
+                    </span>
+                    <span className="text-sm font-black font-mono text-amber-300">
+                      {category.status === 'voting_open'
+                        ? `${totalCatVotes.toLocaleString('pt-BR')} votos`
+                        : `${category.nominees.length} indicados`}
+                    </span>
+                  </div>
                 </div>
               </div>
 
               {/* Nominees Grid */}
               {category.nominees.length === 0 ? (
-                <div className="p-8 rounded-3xl bg-[#14151e]/60 border border-zinc-800/80 text-center space-y-4">
+                <div className="p-8 rounded-3xl bg-[#0f1017] border border-zinc-800 text-center space-y-4">
                   <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-400/20 flex items-center justify-center mx-auto text-amber-400">
                     <Trophy className="w-6 h-6" />
                   </div>
                   <div className="space-y-1">
-                    <h4 className="text-base font-bold text-white font-cinzel">Nenhum indicado cadastrado nesta categoria ainda</h4>
+                    <h3 className="text-base font-bold text-white font-cinzel">Nenhum indicado cadastrado nesta categoria</h3>
                     <p className="text-xs text-zinc-400 max-w-md mx-auto">
-                      Os indicados são adicionados diretamente pelo Administrador no Painel de Controle ou a partir das sugestões da comunidade.
+                      Os indicados são adicionados diretamente pelo Administrador no Painel de Controle ou importados via envio em massa.
                     </p>
                   </div>
                   {onSwitchToAdmin && (
@@ -228,51 +267,49 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
                         className="px-5 py-2 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 border border-amber-400/50 text-amber-300 font-bold text-xs inline-flex items-center gap-2 cursor-pointer transition-colors"
                       >
                         <Crown className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Adicionar Indicados no Painel Admin</span>
+                        <span>Gerenciar Indicados no Painel Admin</span>
                       </button>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {category.nominees.map((nominee) => {
-                  const rankIndex = sortedNominees.findIndex((n) => n.id === nominee.id);
-                  const isLeader = rankIndex === 0 && totalCatVotes > 0;
-                  const isWinner =
-                    category.status === 'winner_revealed' &&
-                    category.winnerNomineeId === nominee.id;
-                  const isUserVoted = userVotedId === nominee.id;
-                  const percentage =
-                    totalCatVotes > 0
-                      ? Math.round((nominee.votes / totalCatVotes) * 100)
-                      : 0;
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {category.nominees.map((nominee) => {
+                    const rankIndex = sortedNominees.findIndex((n) => n.id === nominee.id);
+                    const isLeader = rankIndex === 0 && totalCatVotes > 0;
+                    const isWinner =
+                      category.status === 'winner_revealed' &&
+                      category.winnerNomineeId === nominee.id;
+                    const isUserVoted = userVotedId === nominee.id;
+                    const percentage =
+                      totalCatVotes > 0
+                        ? Math.round((nominee.votes / totalCatVotes) * 100)
+                        : 0;
 
-                  const isThumbCat = isThumbnailCategory(category);
-                  const isMusCat = isMusicCategory(category);
-                  const nomineeThumb = getNomineeThumbnailUrl(nominee);
-                  const displayThumb = isThumbCat ? (nomineeThumb || nominee.avatarUrl) : nomineeThumb;
-                  const youtubeUrl = getNomineeYouTubeUrl(nominee);
-                  const embedUrl = getYouTubeEmbedUrl(youtubeUrl);
-                  const isPlayingThisMusic = playingMusicNomineeId === nominee.id;
+                    const isThumbCat = isThumbnailCategory(category);
+                    const nomineeThumb = getNomineeThumbnailUrl(nominee);
+                    const displayThumb = isThumbCat ? (nomineeThumb || nominee.avatarUrl) : nomineeThumb;
+                    const youtubeUrl = getNomineeYouTubeUrl(nominee);
+                    const embedUrl = getYouTubeEmbedUrl(youtubeUrl);
 
-                  return (
-                    <motion.div
+                    return (
+                      <motion.div
                         key={nominee.id}
                         id={`nominee-card-${nominee.id}`}
-                        whileHover={{ y: -5 }}
+                        whileHover={{ y: -4 }}
                         transition={{ duration: 0.2 }}
-                        className={`relative rounded-2xl overflow-hidden flex flex-col justify-between transition-all duration-300 ${
+                        className={`group relative rounded-2xl overflow-hidden flex flex-col justify-between transition-all duration-300 bg-[#0e0f17] border ${
                           isWinner
-                            ? 'gold-card border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.35)]'
+                            ? 'gold-card border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.35)] ring-1 ring-amber-400/60'
                             : isLeader
-                            ? 'bg-[#151620] border border-amber-500/40 hover:border-amber-400/70'
-                            : 'bg-[#12131a] border border-zinc-800 hover:border-slate-600'
+                            ? 'border-amber-500/40 hover:border-amber-400/70 shadow-lg shadow-amber-950/20'
+                            : 'border-zinc-800/90 hover:border-amber-500/30 hover:shadow-xl'
                         }`}
                       >
-                        {/* Top Rank / Winner Ribbon */}
+                        {/* Top Ribbons & Status Badges */}
                         <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5">
                           {isWinner ? (
-                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase bg-gradient-to-r from-amber-400 to-amber-600 text-black shadow-lg flex items-center gap-1">
+                            <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase bg-gradient-to-r from-amber-400 to-amber-600 text-black shadow-lg flex items-center gap-1">
                               <Trophy className="w-3 h-3" />
                               Vencedor XMA
                             </span>
@@ -281,7 +318,7 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
                               ★ 1º Lugar Atual
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-black/60 border border-zinc-700 text-zinc-400 backdrop-blur-md">
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-black/70 border border-zinc-700 text-zinc-300 backdrop-blur-md">
                               Indicado Oficial
                             </span>
                           )}
@@ -289,226 +326,289 @@ export const NomineesGallery: React.FC<NomineesGalleryProps> = ({
 
                         {nominee.badge && (
                           <div className="absolute top-3 right-3 z-10">
-                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800/90 border border-slate-600 text-slate-200">
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-black/70 border border-amber-400/30 text-amber-300 backdrop-blur-md">
                               {nominee.badge}
                             </span>
                           </div>
                         )}
 
-                        {/* Card Media: Thumbnail (16:9) or YouTube Player or Avatar */}
-                        {isPlayingThisMusic && embedUrl ? (
-                          <div className="relative w-full aspect-video bg-black z-20">
-                            <iframe
-                              src={`${embedUrl}?autoplay=1`}
-                              title={nominee.name}
-                              className="w-full h-full border-0"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                            />
-                            <button
-                              onClick={() => setPlayingMusicNomineeId(null)}
-                              className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/80 hover:bg-zinc-800 text-white cursor-pointer z-30"
-                              title="Fechar Player"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ) : displayThumb ? (
-                          /* 16:9 Thumbnail Display for Thumbnail category or when thumbnail exists */
-                          <div className="relative aspect-video overflow-hidden bg-zinc-950 group">
+                        {/* Card Media Preview */}
+                        {displayThumb ? (
+                          /* 16:9 Thumbnail for thumbnails or video nominees */
+                          <div className="relative aspect-video overflow-hidden bg-zinc-950 group/thumb">
                             <img
                               src={displayThumb}
                               alt={`Thumbnail de ${nominee.name}`}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-500"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-[#12131a] via-transparent to-black/30" />
-                            <div className="absolute top-3 right-3">
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-black/75 border border-amber-400/50 text-amber-300 flex items-center gap-1">
-                                <ImageIcon className="w-3 h-3 text-amber-400" />
-                                Thumbnail 16:9
-                              </span>
-                            </div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#0e0f17] via-transparent to-black/30" />
+                            
+                            {embedUrl && (
+                              <button
+                                type="button"
+                                onClick={() => setTheaterMedia({
+                                  title: nominee.projectTitle || nominee.name,
+                                  embedUrl,
+                                  nomineeName: nominee.name
+                                })}
+                                className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity cursor-pointer"
+                              >
+                                <div className="w-12 h-12 rounded-full bg-red-600 text-white flex items-center justify-center shadow-2xl hover:scale-110 transition-transform">
+                                  <Play className="w-5 h-5 fill-current ml-0.5" />
+                                </div>
+                              </button>
+                            )}
 
-                            {/* Small Avatar pill at bottom left */}
+                            {/* Nominee Small Avatar Pill */}
                             <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between">
-                              <div className="flex items-center gap-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded-xl border border-zinc-700">
+                              <div className="flex items-center gap-2 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-xl border border-zinc-700">
                                 <img
                                   src={nominee.avatarUrl}
                                   alt={nominee.name}
-                                  className="w-6 h-6 rounded-full object-cover border border-amber-400/60"
+                                  className="w-5 h-5 rounded-full object-cover border border-amber-400/60"
                                 />
-                                <span className="text-[11px] font-bold text-white">
+                                <span className="text-[11px] font-bold text-white truncate max-w-[120px]">
                                   {nominee.name}
                                 </span>
                               </div>
                             </div>
                           </div>
                         ) : (
-                          /* Standard Nominee Photo */
-                          <div className="relative h-48 sm:h-52 overflow-hidden bg-zinc-950 group">
+                          /* Creator Portrait / Avatar */
+                          <div className="relative h-48 sm:h-52 overflow-hidden bg-zinc-950 group/avatar">
                             <img
                               src={nominee.avatarUrl}
                               alt={nominee.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100"
+                              className="w-full h-full object-cover group-hover/avatar:scale-105 transition-transform duration-500 opacity-90 group-hover/avatar:opacity-100"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-[#12131a] via-transparent to-black/40" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#0e0f17] via-transparent to-black/30" />
 
-                            {/* Player Social Handle or Status */}
                             <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
                               {nominee.handle ? (
-                                <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-black/75 border border-amber-500/40 text-amber-300 backdrop-blur-md">
+                                <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-black/80 border border-amber-500/40 text-amber-300 backdrop-blur-md">
                                   {nominee.handle}
                                 </span>
                               ) : (
-                                <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-black/60 text-zinc-400">
-                                  Indicado
+                                <span className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-black/60 text-zinc-400">
+                                  Criador PK XD
                                 </span>
                               )}
-                              <span className="text-[11px] font-bold text-amber-300/90">
+                              <span className="text-[11px] font-bold text-amber-300/90 font-mono">
                                 {category.status === 'voting_open' && totalCatVotes > 0
-                                  ? `${percentage}% dos votos`
-                                  : 'Concorrente Oficial'}
+                                  ? `${percentage}% votos`
+                                  : 'Concorrente'}
                               </span>
                             </div>
                           </div>
                         )}
 
-                        {/* Content Details */}
+                        {/* Nominee Card Content */}
                         <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                          <div className="space-y-1.5">
+                          <div className="space-y-2">
                             <div className="flex items-center justify-between gap-2">
-                              <h3 className="text-lg font-bold text-white group-hover:text-amber-300 transition-colors font-cinzel">
+                              <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-amber-300 transition-colors font-cinzel truncate">
                                 {nominee.name}
                               </h3>
                               {nominee.pkxdId && !nominee.pkxdId.startsWith('@') && (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-900 border border-zinc-700 text-zinc-400 shrink-0">
-                                  ID: {nominee.pkxdId}
+                                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-black/60 border border-zinc-700 text-zinc-300 shrink-0">
+                                  {nominee.pkxdId}
                                 </span>
                               )}
                             </div>
 
-                            {nominee.handle && (
-                              <p className="text-xs text-amber-400 font-medium">
-                                {nominee.handle}
+                            {nominee.projectTitle && nominee.projectTitle !== nominee.name && (
+                              <p className="text-xs text-zinc-300 font-medium line-clamp-1">
+                                {nominee.projectTitle}
                               </p>
                             )}
 
-                            {/* In Music category or if has YouTube url: quick listen button */}
+                            {/* Watch / Listen Button if YouTube link exists */}
                             {embedUrl && (
-                              <div className="pt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => setPlayingMusicNomineeId(isPlayingThisMusic ? null : nominee.id)}
-                                  className="w-full py-1.5 px-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                                >
-                                  <Youtube className="w-3.5 h-3.5 text-red-400" />
-                                  <Play className="w-3 h-3 fill-current" />
-                                  <span>{isPlayingThisMusic ? 'Parar Reprodução' : '🎵 Ouvir Música no YouTube'}</span>
-                                </button>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setTheaterMedia({
+                                  title: nominee.projectTitle || nominee.name,
+                                  embedUrl,
+                                  nomineeName: nominee.name
+                                })}
+                                className="w-full py-1.5 px-3 rounded-xl bg-red-600/15 hover:bg-red-600/25 border border-red-500/40 text-red-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                              >
+                                <Youtube className="w-3.5 h-3.5 text-red-400" />
+                                <Play className="w-3 h-3 fill-current" />
+                                <span>Ver Clipe / Vídeo</span>
+                              </button>
                             )}
 
-                            {nominee.projectDescription && nominee.projectDescription !== nominee.projectTitle && (
-                              <p className="text-[11px] text-zinc-400 line-clamp-2 pt-0.5">
+                            {nominee.projectDescription && (
+                              <p className="text-[11px] text-zinc-400 line-clamp-2">
                                 {nominee.projectDescription}
                               </p>
                             )}
                           </div>
 
-                        {/* Progress / Status display */}
-                        {category.status === 'voting_open' ? (
-                          <div className="space-y-1.5 pt-2 border-t border-zinc-800/80">
-                            <div className="flex items-center justify-between text-[11px] text-zinc-400">
-                              <span>Votos apurados:</span>
-                              <span className="font-bold text-zinc-200">
-                                {nominee.votes.toLocaleString('pt-BR')}
-                              </span>
-                            </div>
-                            <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-                              <div
-                                style={{ width: `${percentage}%` }}
-                                className={`h-full rounded-full ${
-                                  isWinner
-                                    ? 'bg-gradient-to-r from-amber-400 to-amber-600'
-                                    : isLeader
-                                    ? 'bg-gradient-to-r from-amber-500 to-amber-300'
-                                    : 'bg-gradient-to-r from-slate-400 to-slate-600'
-                                }`}
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="pt-2 border-t border-zinc-800/80">
-                            <div className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300/90 font-medium text-center">
-                              ✨ Indicado ao Troféu XMA 2026
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Action Buttons */}
-                        <div className="pt-1">
+                          {/* Progress / Status Display */}
                           {category.status === 'voting_open' ? (
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1.5 pt-2 border-t border-zinc-800/80">
+                              <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                                <span>Votos apurados:</span>
+                                <span className="font-bold text-amber-300 font-mono">
+                                  {nominee.votes.toLocaleString('pt-BR')} ({percentage}%)
+                                </span>
+                              </div>
+                              <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                                <div
+                                  style={{ width: `${percentage}%` }}
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    isWinner
+                                      ? 'bg-gradient-to-r from-amber-400 to-amber-600'
+                                      : isLeader
+                                      ? 'bg-gradient-to-r from-amber-500 to-amber-300'
+                                      : 'bg-gradient-to-r from-slate-400 to-slate-600'
+                                  }`}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="pt-2 border-t border-zinc-800/80">
+                              <div className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 font-medium text-center">
+                                ✨ Indicado ao Troféu XMA 2026
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Action Buttons */}
+                          <div className="pt-1">
+                            {category.status === 'voting_open' ? (
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  id={`view-details-${nominee.id}`}
+                                  onClick={() => onSelectNominee(nominee, category)}
+                                  className="py-2 px-3 rounded-xl text-xs font-semibold bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                >
+                                  <Eye className="w-3.5 h-3.5 text-zinc-400" />
+                                  <span>Detalhes</span>
+                                </button>
+
+                                <button
+                                  id={`card-vote-btn-${nominee.id}`}
+                                  onClick={() => onVote(category.id, nominee.id)}
+                                  className={`py-2 px-3 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                                    isUserVoted
+                                      ? 'bg-emerald-600 text-white shadow-md'
+                                      : 'bg-gold-metallic-btn text-black hover:scale-105'
+                                  }`}
+                                >
+                                  {isUserVoted ? (
+                                    <>
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span>Votado</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Crown className="w-3.5 h-3.5" />
+                                      <span>Votar</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            ) : (
                               <button
                                 id={`view-details-${nominee.id}`}
                                 onClick={() => onSelectNominee(nominee, category)}
-                                className="py-2 px-3 rounded-xl text-xs font-semibold bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-200 border border-zinc-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-amber-300 hover:text-amber-200 border border-amber-500/40 hover:border-amber-400 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md group/btn"
                               >
-                                <Eye className="w-3.5 h-3.5 text-zinc-400" />
-                                <span>Detalhes</span>
+                                <Eye className="w-4 h-4 text-amber-400 group-hover/btn:scale-110 transition-transform" />
+                                <span>Conhecer Perfil & Obra</span>
                               </button>
-
-                              <button
-                                id={`card-vote-btn-${nominee.id}`}
-                                onClick={() => onVote(category.id, nominee.id)}
-                                className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                                  isUserVoted
-                                    ? 'bg-emerald-600 text-white shadow-md'
-                                    : 'bg-gold-metallic-btn text-black'
-                                }`}
-                              >
-                                {isUserVoted ? (
-                                  <>
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                    <span>Votado</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Crown className="w-3.5 h-3.5" />
-                                    <span>Votar</span>
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              id={`view-details-${nominee.id}`}
-                              onClick={() => onSelectNominee(nominee, category)}
-                              className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-amber-300 hover:text-amber-200 border border-amber-500/40 hover:border-amber-400 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md group"
-                            >
-                              <Eye className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-                              <span>Conhecer Perfil & Obra</span>
-                            </button>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
               )}
             </section>
           );
         })}
 
         {filteredCategories.length === 0 && (
-          <div className="text-center py-16 bg-[#12131a] rounded-3xl border border-zinc-800 space-y-3">
+          <div className="text-center py-16 bg-[#0e0f16] rounded-3xl border border-zinc-800 space-y-3">
             <Search className="w-10 h-10 text-zinc-600 mx-auto" />
             <h3 className="text-lg font-bold text-white font-cinzel">Nenhum indicado encontrado</h3>
-            <p className="text-sm text-zinc-400">Tente ajustar a sua busca ou selecione outra categoria.</p>
+            <p className="text-sm text-zinc-400">Tente ajustar o termo da sua pesquisa ou selecione outra categoria.</p>
           </div>
         )}
       </div>
+
+      {/* Theater Media Player Modal */}
+      <AnimatePresence>
+        {theaterMedia && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setTheaterMedia(null)}
+              className="absolute inset-0 bg-black/90 backdrop-blur-md"
+            />
+
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative w-full max-w-4xl bg-[#11121a] rounded-3xl overflow-hidden border border-amber-500/40 shadow-2xl z-10 space-y-3"
+            >
+              {/* Modal Header */}
+              <div className="p-4 sm:p-5 border-b border-zinc-800 flex items-center justify-between bg-[#151622]">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-red-600/20 border border-red-500/40 flex items-center justify-center text-red-400">
+                    <Youtube className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm sm:text-base font-bold text-white truncate max-w-md font-cinzel">
+                      {theaterMedia.title}
+                    </h4>
+                    <p className="text-xs text-amber-400">
+                      Obra indicada de {theaterMedia.nomineeName}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setTheaterMedia(null)}
+                  className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-700 transition-colors cursor-pointer"
+                  title="Fechar Player"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* 16:9 Video Player */}
+              <div className="relative aspect-video bg-black w-full">
+                <iframe
+                  src={`${theaterMedia.embedUrl}?autoplay=1`}
+                  title={theaterMedia.title}
+                  className="w-full h-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 flex items-center justify-between text-xs text-zinc-400 bg-[#0d0e14]">
+                <span>Transmissão Oficial • YouTube Player XMA</span>
+                <button
+                  onClick={() => setTheaterMedia(null)}
+                  className="px-4 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
