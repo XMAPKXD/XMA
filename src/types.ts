@@ -75,10 +75,24 @@ export const AUTHORIZED_ADMIN_EMAILS = [
   'kawanyuri35@gmail.com'
 ] as const;
 
+export const ADMIN_MASTER_PINS = [
+  'XMA2026',
+  'xma2026',
+  '2026',
+  'ADMIN2026',
+  'admin'
+] as const;
+
 export function isAuthorizedAdminEmail(email?: string | null): boolean {
   if (!email) return false;
   const clean = email.trim().toLowerCase();
   return AUTHORIZED_ADMIN_EMAILS.some((adm) => adm.toLowerCase() === clean);
+}
+
+export function isValidAdminPin(pin?: string | null): boolean {
+  if (!pin) return false;
+  const clean = pin.trim().toLowerCase();
+  return ADMIN_MASTER_PINS.some((p) => p.toLowerCase() === clean);
 }
 
 export interface PKXDUserAccount {

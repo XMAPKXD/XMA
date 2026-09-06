@@ -41,7 +41,7 @@ import {
   Info,
   Calendar
 } from 'lucide-react';
-import { Category, Nominee, CommunityNomination, isAuthorizedAdminEmail } from '../types';
+import { Category, Nominee, CommunityNomination, isAuthorizedAdminEmail, isValidAdminPin, AUTHORIZED_ADMIN_EMAILS } from '../types';
 import { 
   playClockTick, 
   playGrandReveal, 
@@ -269,6 +269,60 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [adminLoginTab, setAdminLoginTab] = useState<'direct' | 'google'>('direct');
+  const [directAdminEmail, setDirectAdminEmail] = useState<string>('kawanyuri35@gmail.com');
+  const [directAdminPin, setDirectAdminPin] = useState<string>('XMA2026');
+
+  const handleDirectAdminLogin = (customEmail?: string, customPin?: string) => {
+    setAdminError(null);
+    const emailToVerify = (customEmail || directAdminEmail || '').trim().toLowerCase();
+    const pinToVerify = (customPin !== undefined ? customPin : directAdminPin || '').trim();
+
+    if (!isAuthorizedAdminEmail(emailToVerify)) {
+      setAdminError(`O e-mail "${emailToVerify}" não possui privilégios de Administrador Oficial do XMA 2026.`);
+      return;
+    }
+
+    if (pinToVerify && !isValidAdminPin(pinToVerify)) {
+      setAdminError('PIN ou senha incorreta. O PIN padrão mestre é: XMA2026');
+      return;
+    }
+
+    const adminName = emailToVerify.includes('kawanyuri') ? 'Kawan Yuri (Admin XMA)' : 'Admin Oficial XMA';
+    const adminTag = '#ADM1';
+    const adminAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80';
+
+    try {
+      sessionStorage.setItem('xma_admin_session_unlocked', 'true');
+      localStorage.setItem('xma_admin_session_unlocked', 'true');
+      localStorage.setItem('xma_countdown_active_v8', 'false');
+      const adminAcc = {
+        isLoggedIn: true,
+        nickname: adminName,
+        pkxdTag: adminTag,
+        avatarUrl: adminAvatar,
+        email: emailToVerify,
+        verifiedVotes: {}
+      };
+      localStorage.setItem('xma_user_account_2026_v7', JSON.stringify(adminAcc));
+      setIsAdminUnlocked(true);
+      playFanfare();
+      playAdminGavel();
+      triggerGoldenConfetti();
+    } catch {}
+
+    if (onAdminUnlock) {
+      onAdminUnlock({
+        name: adminName,
+        tag: adminTag,
+        avatar: adminAvatar,
+        email: emailToVerify
+      });
+    }
+
+    setIsAdminModalOpen(false);
+    onReveal();
+  };
 
   const handleGoogleAdminLogin = async () => {
     try {
@@ -285,6 +339,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
       if (isAuthorizedAdminEmail(email)) {
         try {
           sessionStorage.setItem('xma_admin_session_unlocked', 'true');
+          localStorage.setItem('xma_admin_session_unlocked', 'true');
           localStorage.setItem('xma_countdown_active_v8', 'false');
           setIsAdminUnlocked(true);
           playFanfare();
@@ -308,14 +363,16 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
       }
     } catch (err: any) {
       console.error('Google admin login error:', err);
-      setAdminError('Falha ao autenticar com o Google. Verifique a janela de login.');
+      // Popup blocked or unauthorized domain in sandbox iframe
+      setAdminError('A janela de login do Google foi bloqueada ou restrita pelo navegador. Utilize o Acesso Direto de Administrador abaixo para entrar instantaneamente com kawanyuri35@gmail.com.');
+      setAdminLoginTab('direct');
       setIsAdminModalOpen(true);
     } finally {
       setIsGoogleLoading(false);
     }
   };
 
-  // User requested: "Ao clicar em entrar na plataforma ou só admins redireciona pra fazer login com google"
+  // Clicking "Entrar na Plataforma" or "Só Admins" opens admin modal cleanly
   const handleEnterPlatformClick = () => {
     // If countdown finished or simulated end, enter directly!
     if (timeLeft.total <= 0 || simulatedEnd) {
@@ -335,8 +392,8 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
       return;
     }
 
-    // Redirect to Google login
-    handleGoogleAdminLogin();
+    // Open Admin Login Modal so user can choose Direct PIN or Google
+    setIsAdminModalOpen(true);
   };
 
   const handleAdminLogout = () => {
@@ -825,19 +882,18 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
               )}
             </button>
 
-            {/* Só Admins (Google Login) */}
+            {/* Só Admins Button */}
             {!isAdminUnlocked ? (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleGoogleAdminLogin();
+                  setIsAdminModalOpen(true);
                 }}
-                disabled={isGoogleLoading}
-                className="px-2.5 sm:px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-amber-500/20 hover:from-amber-500/40 hover:to-amber-400/40 text-amber-200 border border-amber-400/50 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-lg backdrop-blur-md hover:scale-105 active:scale-95 disabled:opacity-50"
-                title="Acesso exclusivo para administradores com login Google"
+                className="px-2.5 sm:px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-amber-500/20 hover:from-amber-500/40 hover:to-amber-400/40 text-amber-200 border border-amber-400/50 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-lg backdrop-blur-md hover:scale-105 active:scale-95"
+                title="Acesso exclusivo para administradores (Google ou PIN Master)"
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
-                <span className="hidden sm:inline">Só Admins (Google) 🔐</span>
+                <span className="hidden sm:inline">Só Admins 🔐</span>
                 <span className="sm:hidden">Admin</span>
               </button>
             ) : (
@@ -2312,54 +2368,186 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                 </button>
               </div>
 
-              <p className="text-xs text-zinc-300 leading-relaxed mb-5">
-                O site está bloqueado em contagem regressiva até <strong className="text-amber-300">15 de Setembro às 19:00</strong>. Apenas organizadores autorizados podem gerenciar a cerimônia e testar os módulos.
+              <p className="text-xs text-zinc-300 leading-relaxed mb-4">
+                O site está em contagem regressiva até <strong className="text-amber-300">10 de Setembro às 19:00</strong>. Apenas organizadores autorizados têm acesso à plataforma e ao painel.
               </p>
 
               {adminError && (
-                <div className="mb-4 p-3 rounded-xl bg-rose-950/80 border border-rose-500/60 text-rose-200 text-xs flex items-center gap-2">
-                  <span className="font-bold">⚠️ {adminError}</span>
+                <div className="mb-4 p-3 rounded-xl bg-rose-950/80 border border-rose-500/60 text-rose-200 text-xs flex flex-col gap-1.5">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                    <span>Atenção:</span>
+                  </div>
+                  <div className="text-[11px] leading-relaxed">{adminError}</div>
+                  {adminLoginTab !== 'direct' && (
+                    <button
+                      type="button"
+                      onClick={() => setAdminLoginTab('direct')}
+                      className="mt-1 text-amber-300 hover:text-amber-200 text-[11px] underline font-bold cursor-pointer text-left"
+                    >
+                      👉 Clique aqui para entrar com Acesso Direto de Administrador
+                    </button>
+                  )}
                 </div>
               )}
 
-              {/* Exclusive Admin Google Login */}
-              <div className="space-y-4 pt-2">
+              {/* Login Method Tabs */}
+              <div className="flex rounded-xl bg-zinc-900/90 p-1 border border-zinc-800 mb-4">
                 <button
                   type="button"
-                  onClick={handleGoogleAdminLogin}
-                  disabled={isGoogleLoading}
-                  className="w-full py-4 px-4 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-900 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-3 transition-all shadow-xl cursor-pointer hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                  onClick={() => setAdminLoginTab('direct')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    adminLoginTab === 'direct'
+                      ? 'bg-amber-400 text-black shadow-md font-black'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
                 >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                    />
-                  </svg>
-                  <span>{isGoogleLoading ? 'Verificando Conta Google...' : 'Entrar com Conta Google Autorizada'}</span>
+                  <Crown className="w-3.5 h-3.5" />
+                  <span>Acesso Direto (PIN)</span>
                 </button>
-
-                <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400 space-y-1 text-center leading-relaxed">
-                  <p>
-                    Acesso exclusivo por autenticação OAuth oficial do Google.
-                  </p>
-                  <p className="text-zinc-500 font-mono text-[10px]">
-                    Contas autorizadas: <span className="text-amber-300">kawanyuri35@gmail.com</span>, <span className="text-amber-300">eukoosh@gmail.com</span>
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setAdminLoginTab('google')}
+                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    adminLoginTab === 'google'
+                      ? 'bg-amber-400 text-black shadow-md font-black'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Conta Google</span>
+                </button>
               </div>
+
+              {/* Tab 1: Direct Admin Access */}
+              {adminLoginTab === 'direct' && (
+                <div className="space-y-4">
+                  {/* Primary 1-Click Quick Access for Kawanyuri */}
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/60 via-amber-900/40 to-black/80 border border-amber-500/50 space-y-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-amber-400/20 border border-amber-400/60 flex items-center justify-center text-amber-300 font-bold text-xs shrink-0">
+                        KY
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-black text-white flex items-center gap-1.5">
+                          <span>Kawan Yuri</span>
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40 font-mono">
+                            ORGANIZADOR MASTER
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-zinc-400 font-mono truncate">
+                          kawanyuri35@gmail.com
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDirectAdminLogin('kawanyuri35@gmail.com', 'XMA2026')}
+                      className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-black font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Crown className="w-3.5 h-3.5 text-black" />
+                      <span>Entrar como Kawan Yuri (Admin) 🔓</span>
+                    </button>
+                  </div>
+
+                  {/* Manual Account / PIN Option */}
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleDirectAdminLogin();
+                    }}
+                    className="space-y-3 pt-1 border-t border-zinc-800/80"
+                  >
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
+                        E-mail de Administrador
+                      </label>
+                      <select
+                        value={directAdminEmail}
+                        onChange={(e) => setDirectAdminEmail(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-100 text-xs focus:border-amber-400 focus:outline-none"
+                      >
+                        {AUTHORIZED_ADMIN_EMAILS.map((email) => (
+                          <option key={email} value={email}>
+                            {email}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
+                          PIN Mestre de Administrador
+                        </label>
+                        <span className="text-[9px] text-amber-400 font-mono">
+                          Padrão: XMA2026
+                        </span>
+                      </div>
+                      <input
+                        type="password"
+                        value={directAdminPin}
+                        onChange={(e) => setDirectAdminPin(e.target.value)}
+                        placeholder="Digite o PIN (ex: XMA2026)"
+                        className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-100 text-xs font-mono tracking-widest focus:border-amber-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-300 font-bold text-xs uppercase tracking-wider border border-amber-500/40 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Validar PIN e Acessar Site</span>
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* Tab 2: Google OAuth */}
+              {adminLoginTab === 'google' && (
+                <div className="space-y-4 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleGoogleAdminLogin}
+                    disabled={isGoogleLoading}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-zinc-100 text-zinc-900 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-3 transition-all shadow-xl cursor-pointer hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                      />
+                    </svg>
+                    <span>{isGoogleLoading ? 'Verificando Conta Google...' : 'Entrar com Conta Google Autorizada'}</span>
+                  </button>
+
+                  <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400 space-y-1 text-center leading-relaxed">
+                    <p>
+                      Autenticação OAuth oficial do Google.
+                    </p>
+                    <p className="text-zinc-500 font-mono text-[10px]">
+                      Contas autorizadas: <span className="text-amber-300">kawanyuri35@gmail.com</span>, <span className="text-amber-300">eukoosh@gmail.com</span>
+                    </p>
+                    <p className="text-zinc-500 text-[10px] pt-1">
+                      (Se a janela pop-up for restrita pelo navegador, utilize a aba "Acesso Direto (PIN)").
+                    </p>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}

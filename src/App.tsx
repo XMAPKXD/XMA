@@ -85,7 +85,8 @@ export default function App() {
       return false; // Anyone can access after countdown!
     }
     try {
-      const adminUnlocked = sessionStorage.getItem('xma_admin_session_unlocked') === 'true';
+      const adminUnlocked = sessionStorage.getItem('xma_admin_session_unlocked') === 'true' ||
+        localStorage.getItem('xma_admin_session_unlocked') === 'true';
       if (adminUnlocked) return false; // Admin can access
     } catch {}
     return true; // Locked for non-admins until countdown ends!
@@ -259,6 +260,7 @@ export default function App() {
     try {
       if (userAccount?.email && isAuthorizedAdminEmail(userAccount.email)) return true;
       if (sessionStorage.getItem('xma_admin_session_unlocked') === 'true') return true;
+      if (localStorage.getItem('xma_admin_session_unlocked') === 'true') return true;
     } catch {}
     return false;
   }, [userAccount?.email]);
@@ -276,6 +278,7 @@ export default function App() {
         let adminUnlocked = false;
         try {
           adminUnlocked = sessionStorage.getItem('xma_admin_session_unlocked') === 'true' ||
+            localStorage.getItem('xma_admin_session_unlocked') === 'true' ||
             (!!userAccount?.email && isAuthorizedAdminEmail(userAccount.email));
         } catch {}
 
@@ -295,6 +298,7 @@ export default function App() {
     let adminUnlocked = false;
     try {
       adminUnlocked = sessionStorage.getItem('xma_admin_session_unlocked') === 'true' ||
+        localStorage.getItem('xma_admin_session_unlocked') === 'true' ||
         (!!userAccount?.email && isAuthorizedAdminEmail(userAccount.email));
     } catch {}
 
@@ -305,6 +309,8 @@ export default function App() {
     }
 
     try {
+      sessionStorage.setItem('xma_admin_session_unlocked', 'true');
+      localStorage.setItem('xma_admin_session_unlocked', 'true');
       localStorage.setItem('xma_countdown_active_v8', 'false');
     } catch {}
     setIsCountdownActive(false);
@@ -717,17 +723,21 @@ export default function App() {
           userPkxdTag={userAccount.pkxdTag}
           targetDate={new Date(countdownTargetTimestamp)}
           onAdminUnlock={(adminUser) => {
-            try {
-              sessionStorage.setItem('xma_admin_session_unlocked', 'true');
-            } catch {}
-            setUserAccount({
+            const adminAcc = {
               isLoggedIn: true,
               nickname: adminUser.name,
               pkxdTag: adminUser.tag,
               avatarUrl: adminUser.avatar,
               email: adminUser.email,
               verifiedVotes: {}
-            });
+            };
+            try {
+              sessionStorage.setItem('xma_admin_session_unlocked', 'true');
+              localStorage.setItem('xma_admin_session_unlocked', 'true');
+              localStorage.setItem('xma_countdown_active_v8', 'false');
+              localStorage.setItem('xma_user_account_2026_v7', JSON.stringify(adminAcc));
+            } catch {}
+            setUserAccount(adminAcc);
             setIsCountdownActive(false);
             setActiveTab('admin');
           }}
