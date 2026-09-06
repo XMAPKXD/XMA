@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Category, Nominee, SuspiciousVoteSpike } from '../types';
+import { Category, Nominee, SuspiciousVoteSpike, VOTE_WEIGHT_MASS, VOTE_WEIGHT_VERIFIED } from '../types';
 import { 
   ShieldAlert, 
   ShieldCheck, 
@@ -72,9 +72,9 @@ export const AdminVotingStats: React.FC<AdminVotingStatsProps> = ({
     }
   ]);
 
-  // Weight constants defined by XMA specifications
-  const WEIGHT_UNIQUE = 0.75; // 75%
-  const WEIGHT_MASS = 0.25;   // 25%
+  // Weight constants defined by XMA specifications (65% Voto Único com Login / 35% Voto em Massa sem Login)
+  const WEIGHT_UNIQUE = VOTE_WEIGHT_VERIFIED; // 0.65 (65%)
+  const WEIGHT_MASS = VOTE_WEIGHT_MASS;       // 0.35 (35%)
 
   // Normalize and enrich all nominees with voting metrics
   const processedNominees = useMemo(() => {
@@ -285,14 +285,14 @@ export const AdminVotingStats: React.FC<AdminVotingStatsProps> = ({
   const handleExportReport = () => {
     const report = {
       generatedAt: new Date().toISOString(),
-      formula: 'Score Ponderado = (Votos Únicos * 0.75) + (Votos em Massa * 0.25)',
+      formula: 'Score Ponderado = (Votos Únicos * 0.65) + (Votos em Massa * 0.35)',
       overallMetrics,
       data: filteredNominees.map((item) => ({
         nomineeName: item.nominee.name,
         handle: item.nominee.handle,
         category: item.category.title,
-        uniqueVotes_75Percent: item.uniqueVotes,
-        massVotes_25Percent: item.massVotes,
+        uniqueVotes_65Percent: item.uniqueVotes,
+        massVotes_35Percent: item.massVotes,
         grossVotes: item.totalVotes,
         finalWeightedScore: item.weightedScore,
         categoryShare: `${item.categoryWeightedShare}%`,
@@ -354,12 +354,12 @@ export const AdminVotingStats: React.FC<AdminVotingStatsProps> = ({
             <div>
               <span className="font-bold text-amber-300">Regra de Cálculo de Vencedores: </span>
               <span className="text-zinc-300">
-                O <strong className="text-amber-200">Voto Único com Login</strong> compõe <strong className="text-emerald-400">75%</strong> do peso final, enquanto o <strong className="text-blue-200">Voto em Massa da Torcida</strong> compõe <strong className="text-blue-400">25%</strong>.
+                O <strong className="text-emerald-400">Voto Único com Login</strong> (1 voto por pessoa) tem peso de <strong className="text-emerald-400 font-bold">65%</strong>, e o <strong className="text-amber-300">Voto em Massa da Torcida</strong> (sem login, votos ilimitados) tem peso de <strong className="text-amber-300 font-bold">35%</strong>.
               </span>
             </div>
           </div>
           <div className="px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-400/30 text-amber-300 font-mono text-[11px] font-bold self-start sm:self-auto shrink-0">
-            Score = (Único × 0.75) + (Massa × 0.25)
+            Score = (Único × 0.65) + (Massa × 0.35)
           </div>
         </div>
       </div>
@@ -371,10 +371,10 @@ export const AdminVotingStats: React.FC<AdminVotingStatsProps> = ({
           <div className="flex items-center justify-between pb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Votos Únicos (75% Peso)</span>
+              <span>Votos Únicos (65% Peso)</span>
             </span>
             <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold">
-              0.75x
+              0.65x
             </span>
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-white font-cinzel mt-1">
@@ -391,12 +391,12 @@ export const AdminVotingStats: React.FC<AdminVotingStatsProps> = ({
         {/* Card 2: Mass Votes */}
         <div className="p-5 rounded-2xl bg-[#13141f] border border-blue-500/30 shadow-lg relative overflow-hidden">
           <div className="flex items-center justify-between pb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
-              <Flame className="w-4 h-4 text-blue-400" />
-              <span>Votos em Massa (25% Peso)</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+              <Flame className="w-4 h-4 text-amber-400" />
+              <span>Votos em Massa (35% Peso)</span>
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 text-[10px] font-mono font-bold">
-              0.25x
+            <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold">
+              0.35x
             </span>
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-white font-cinzel mt-1">
@@ -541,9 +541,9 @@ export const AdminVotingStats: React.FC<AdminVotingStatsProps> = ({
                 onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                 className="px-3 py-2 rounded-xl bg-black border border-zinc-700 text-amber-300 font-bold text-xs outline-none focus:border-amber-400 cursor-pointer"
               >
-                <option value="weightedScore">🌟 Score Ponderado (75/25)</option>
-                <option value="uniqueVotes">🛡️ Votos Únicos (75%)</option>
-                <option value="massVotes">⚡ Votos em Massa (25%)</option>
+                <option value="weightedScore">🌟 Score Ponderado (65/35)</option>
+                <option value="uniqueVotes">🛡️ Votos Únicos (65%)</option>
+                <option value="massVotes">⚡ Votos em Massa (35%)</option>
                 <option value="totalVotes">📊 Total Bruto de Votos</option>
                 <option value="riskRatio">🚨 Taxa de Anomalia / Ratio</option>
               </select>
@@ -568,11 +568,11 @@ export const AdminVotingStats: React.FC<AdminVotingStatsProps> = ({
                     <th className="py-3.5 px-4 font-bold">Indicado & Categoria</th>
                     <th className="py-3.5 px-4 font-bold text-center">
                       <div className="text-emerald-400">Votos Únicos</div>
-                      <div className="text-[9px] text-zinc-500 font-normal">Peso 75% • Autenticado</div>
+                      <div className="text-[9px] text-zinc-500 font-normal">Peso 65% • Autenticado</div>
                     </th>
                     <th className="py-3.5 px-4 font-bold text-center">
-                      <div className="text-blue-400">Votos em Massa</div>
-                      <div className="text-[9px] text-zinc-500 font-normal">Peso 25% • Torcida</div>
+                      <div className="text-amber-400">Votos em Massa</div>
+                      <div className="text-[9px] text-zinc-500 font-normal">Peso 35% • Torcida</div>
                     </th>
                     <th className="py-3.5 px-4 font-bold text-center">
                       <div className="text-white">Total Bruto</div>

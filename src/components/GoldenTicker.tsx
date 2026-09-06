@@ -24,7 +24,7 @@ export const GoldenTicker: React.FC<GoldenTickerProps> = ({ tickerText }) => {
           <span className="text-zinc-600">•</span>
           <span className="flex items-center gap-2 text-slate-300">
             <Flame className="w-3.5 h-3.5 text-amber-500 inline" />
-            VOTAÇÃO ABERTA EM TODAS AS CATEGORIAS METÁLICAS
+            CRONOGRAMA: VOTAÇÕES DE 10 A 20 DE SETEMBRO • REVELAÇÃO DOS VENCEDORES DIA 25
           </span>
           <span className="text-zinc-600">•</span>
           <span className="flex items-center gap-2 text-amber-300">

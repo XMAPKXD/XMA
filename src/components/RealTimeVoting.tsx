@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Category, Nominee, PKXDUserAccount } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Category, Nominee, PKXDUserAccount, calculateNomineeVotingScores, VOTE_WEIGHT_MASS, VOTE_WEIGHT_VERIFIED } from '../types';
 import { 
   Trophy, 
   Vote, 
@@ -71,6 +71,11 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
     ? [...currentCategory.nominees].sort((a, b) => b.votes - a.votes)
     : [];
 
+  // Official Category Dual-Voting Calculations (65% Voto Único com Login / 35% Voto em Massa sem Login)
+  const nomineeScores = useMemo(() => {
+    return currentCategory ? calculateNomineeVotingScores(currentCategory) : {};
+  }, [currentCategory]);
+
   // Verified votes count
   const verifiedVotedCount = Object.keys(userAccount.verifiedVotes || {}).length;
   const verifiedHasVotedCurrent = currentCategory ? Boolean(userAccount.verifiedVotes?.[currentCategory.id]) : false;
@@ -128,12 +133,12 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
               Centro de <span className="text-gold-metallic">Votação Oficial</span>
             </h1>
             <p className="text-zinc-300 text-sm sm:text-base leading-relaxed">
-              Participe dos mutirões com o <strong className="text-amber-300">Voto em Massa</strong> ou registre o seu <strong className="text-amber-300">Voto Único Verificado</strong> conectado à sua conta de jogador!
+              Participe dos mutirões ilimitados com o <strong className="text-amber-300">Voto em Massa (Peso 35%)</strong> sem login ou registre seu <strong className="text-emerald-400">Voto Único (Peso 65%)</strong> conectado à sua conta oficial!
             </p>
           </div>
 
           {/* Voting Mode Switcher Capsule */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-[#0e0f16]/95 border border-amber-500/30 shadow-2xl space-y-3 min-w-[300px] backdrop-blur-md">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#0e0f16]/95 border border-amber-500/30 shadow-2xl space-y-3 min-w-[320px] backdrop-blur-md">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 font-mono">
                 Modalidade de Voto
@@ -145,31 +150,41 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-1.5 bg-black/60 p-1 rounded-xl border border-zinc-800">
+            <div className="grid grid-cols-2 gap-2 bg-black/60 p-1.5 rounded-xl border border-zinc-800">
               <button
                 id="tab-mode-mass-btn"
                 onClick={() => setVotingMode('mass')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                className={`py-2 px-3 rounded-lg text-xs font-bold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
                   votingMode === 'mass'
                     ? 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-black shadow-md font-black'
                     : 'text-zinc-400 hover:text-white'
                 }`}
               >
-                <Flame className="w-3.5 h-3.5" />
-                <span>Modo Torcida</span>
+                <div className="flex items-center gap-1.5">
+                  <Flame className="w-3.5 h-3.5" />
+                  <span>Voto em Massa</span>
+                </div>
+                <span className={`text-[10px] font-mono font-bold ${votingMode === 'mass' ? 'text-black/80' : 'text-amber-400'}`}>
+                  Sem Login • 35%
+                </span>
               </button>
 
               <button
                 id="tab-mode-verified-btn"
                 onClick={() => setVotingMode('verified')}
-                className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                className={`py-2 px-3 rounded-lg text-xs font-bold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
                   votingMode === 'verified'
                     ? 'bg-gradient-to-r from-emerald-400 to-teal-400 text-black shadow-md font-black'
                     : 'text-zinc-400 hover:text-white'
                 }`}
               >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Voto com Login</span>
+                <div className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Voto Único</span>
+                </div>
+                <span className={`text-[10px] font-mono font-bold ${votingMode === 'verified' ? 'text-black/80' : 'text-emerald-400'}`}>
+                  Com Login • 65%
+                </span>
               </button>
             </div>
 
@@ -177,14 +192,14 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
             <div className="text-[11px] text-zinc-400 leading-tight">
               {votingMode === 'mass' ? (
                 <div className="flex items-center justify-between text-amber-300/90 font-medium">
-                  <span>⚡ Cliques ilimitados para mutirões</span>
-                  <span className="text-[10px] uppercase font-bold text-amber-400">Torcida Ativa</span>
+                  <span>⚡ Sem login • Votos ilimitados para mutirões</span>
+                  <span className="text-[10px] uppercase font-bold text-amber-400 font-mono px-2 py-0.5 bg-amber-400/10 rounded">Peso 35%</span>
                 </div>
               ) : (
                 <div className="flex items-center justify-between text-emerald-300 font-medium">
-                  <span>🛡️ 1 Voto oficial por categoria</span>
-                  <span className="text-[10px] uppercase font-bold">
-                    {verifiedVotedCount}/{totalCategories} Votos
+                  <span>🛡️ Com login • 1 voto único por categoria</span>
+                  <span className="text-[10px] uppercase font-bold text-emerald-400 font-mono px-2 py-0.5 bg-emerald-400/10 rounded">
+                    Peso 65% ({verifiedVotedCount}/{totalCategories})
                   </span>
                 </div>
               )}
@@ -469,10 +484,10 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
                         </div>
 
                         {/* Vote Controls & Count */}
-                        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-3 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-zinc-800">
+                        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2.5 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-zinc-800">
                           <div className="text-left sm:text-right">
                             <div className="text-[11px] text-zinc-400">
-                              {currentCategory.status === 'voting_open' ? 'Total Apurado' : 'Status'}
+                              {currentCategory.status === 'voting_open' ? 'Total Bruto' : 'Status'}
                             </div>
                             <div className="text-base font-black text-amber-300 font-mono">
                               {currentCategory.status === 'voting_open'
@@ -483,36 +498,57 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
 
                           {currentCategory.status === 'voting_open' ? (
                             votingMode === 'mass' ? (
-                              <button
-                                id={`mass-vote-btn-${nominee.id}`}
-                                onClick={() => handleMassVoteClick(nominee.id)}
-                                className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-gold-metallic-btn text-black flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20 active:scale-90 hover:scale-105 transition-all"
-                              >
-                                <Flame className="w-4 h-4" />
-                                <span>Votar (+{massVoteMultiplier})</span>
-                              </button>
+                              <div className="flex flex-col items-end gap-1">
+                                <button
+                                  id={`mass-vote-btn-${nominee.id}`}
+                                  onClick={() => handleMassVoteClick(nominee.id)}
+                                  className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-gold-metallic-btn text-black flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20 active:scale-90 hover:scale-105 transition-all"
+                                >
+                                  <Flame className="w-4 h-4" />
+                                  <span>Votar (+{massVoteMultiplier})</span>
+                                </button>
+                                <span className="text-[10px] text-amber-400/80 font-mono font-semibold">Sem login • 35% peso</span>
+                              </div>
                             ) : (
-                              <button
-                                id={`verified-vote-btn-${nominee.id}`}
-                                onClick={() => handleVerifiedVoteClick(nominee.id)}
-                                className={`px-5 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase flex items-center gap-2 cursor-pointer transition-all ${
-                                  isVerifiedVoted
-                                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-                                    : 'bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-black shadow-md hover:scale-105'
-                                }`}
-                              >
-                                {isVerifiedVoted ? (
-                                  <>
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    <span>Voto Registrado</span>
-                                  </>
+                              <div className="flex flex-col items-end gap-1">
+                                {!userAccount.isLoggedIn ? (
+                                  <button
+                                    id={`login-vote-btn-${nominee.id}`}
+                                    onClick={onOpenLoginModal}
+                                    className="px-4 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-400 text-black shadow-lg shadow-emerald-500/25 hover:scale-105 transition-all cursor-pointer"
+                                  >
+                                    <LogIn className="w-4 h-4" />
+                                    <span>Login p/ Votar (65%)</span>
+                                  </button>
+                                ) : isVerifiedVoted ? (
+                                  <button
+                                    disabled
+                                    className="px-4 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-400 text-emerald-300 shadow-md cursor-default"
+                                  >
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                    <span>Voto Único (65%) ✓</span>
+                                  </button>
+                                ) : verifiedHasVotedCurrent ? (
+                                  <button
+                                    id={`switch-vote-btn-${nominee.id}`}
+                                    onClick={() => handleVerifiedVoteClick(nominee.id)}
+                                    className="px-4 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-zinc-800 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/50 hover:border-emerald-400 hover:scale-105 transition-all cursor-pointer"
+                                  >
+                                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                                    <span>Mudar p/ Este (65%)</span>
+                                  </button>
                                 ) : (
-                                  <>
+                                  <button
+                                    id={`verified-vote-btn-${nominee.id}`}
+                                    onClick={() => handleVerifiedVoteClick(nominee.id)}
+                                    className="px-4 py-2.5 rounded-xl text-xs font-black tracking-wider uppercase flex items-center gap-1.5 bg-gradient-to-r from-emerald-400 to-teal-400 text-black shadow-lg shadow-emerald-500/30 hover:scale-105 transition-all cursor-pointer"
+                                  >
                                     <ShieldCheck className="w-4 h-4" />
-                                    <span>Voto Único</span>
-                                  </>
+                                    <span>Voto Único (65%)</span>
+                                  </button>
                                 )}
-                              </button>
+                                <span className="text-[10px] text-emerald-400/90 font-mono font-semibold">1 voto com login • 65%</span>
+                              </div>
                             )
                           ) : (
                             <button
@@ -526,17 +562,39 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
                         </div>
                       </div>
 
-                      {/* Progress Bar */}
+                      {/* Progress Bar & Weighted Metrics */}
                       {currentCategory.status === 'voting_open' && (
-                        <div className="mt-4 pt-3 border-t border-zinc-800/80 space-y-1.5">
+                        <div className="mt-4 pt-3 border-t border-zinc-800/80 space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+                            <div className="flex items-center gap-3">
+                              <span className="text-amber-300/90 flex items-center gap-1">
+                                <Flame className="w-3 h-3 text-amber-400" />
+                                <span>Massa (35%):</span>
+                                <strong className="text-white">
+                                  {(nominee.massVotes !== undefined ? nominee.massVotes : Math.max(0, nominee.votes - (nominee.verifiedVotes || 0))).toLocaleString('pt-BR')}
+                                </strong>
+                              </span>
+                              <span className="text-emerald-400/90 flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                <span>Único (65%):</span>
+                                <strong className="text-white">
+                                  {(nominee.verifiedVotes || 0).toLocaleString('pt-BR')}
+                                </strong>
+                              </span>
+                            </div>
+                            <span className="text-amber-300 font-bold bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/30">
+                              Score Ponderado: {nomineeScores[nominee.id]?.weightedScorePct ?? percentage}%
+                            </span>
+                          </div>
+
                           <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
                             <motion.div
                               initial={{ width: 0 }}
-                              animate={{ width: `${percentage}%` }}
+                              animate={{ width: `${nomineeScores[nominee.id]?.weightedScorePct ?? percentage}%` }}
                               transition={{ duration: 0.5, ease: 'easeOut' }}
                               className={`h-full rounded-full ${
                                 isVerifiedVoted
-                                  ? 'bg-gradient-to-r from-emerald-400 via-amber-300 to-amber-500'
+                                  ? 'bg-gradient-to-r from-emerald-400 via-teal-300 to-amber-400'
                                   : isLeader
                                   ? 'bg-gradient-to-r from-amber-500 via-amber-300 to-amber-500'
                                   : 'bg-gradient-to-r from-slate-400 to-slate-600'
@@ -614,7 +672,10 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
 
               <div className="space-y-2.5">
                 {sortedNominees.map((n, i) => {
+                  const score = nomineeScores[n.id];
                   const pct = totalCategoryVotes > 0 ? Math.round((n.votes / totalCategoryVotes) * 100) : 0;
+                  const weightedPct = score ? score.weightedScorePct : pct;
+
                   return (
                     <div
                       key={n.id}
@@ -632,14 +693,16 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
                         }`}>
                           {i + 1}
                         </span>
-                        <span className="font-semibold text-zinc-200 truncate max-w-[130px]">
+                        <span className="font-semibold text-zinc-200 truncate max-w-[120px]">
                           {n.name}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-2 font-mono shrink-0">
-                        <span className="text-zinc-400">{n.votes.toLocaleString('pt-BR')}</span>
-                        <span className="font-bold text-amber-300">{pct}%</span>
+                        <span className="text-zinc-400 text-[11px]">{n.votes.toLocaleString('pt-BR')}</span>
+                        <span className="font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-400/30 text-[11px]">
+                          {weightedPct}% pond.
+                        </span>
                       </div>
                     </div>
                   );
@@ -651,14 +714,17 @@ export const RealTimeVoting: React.FC<RealTimeVotingProps> = ({
             <div className="p-6 rounded-3xl bg-[#0e0f16] border border-zinc-800 space-y-4 text-xs text-zinc-400">
               <div className="flex items-center gap-2 font-bold text-zinc-200 uppercase tracking-wider text-[11px] font-mono">
                 <Award className="w-4 h-4 text-amber-400" />
-                <span>Regras de Apuração</span>
+                <span>Critérios de Apuração Oficial</span>
               </div>
               <div className="space-y-3 leading-relaxed">
                 <div>
-                  <strong className="text-amber-400">🔥 Modo Torcida (Voto em Massa):</strong> Projetado para fã-clubes realizarem mutirões sem limites. Você pode usar multiplicadores (+1 até +100).
+                  <strong className="text-amber-400">🔥 Voto em Massa (Sem Login) — Peso 35%:</strong> A pessoa vota quantas vezes quiser, ideal para mutirões de torcida. Pode usar os multiplicadores de clique (+1 até +100).
                 </div>
                 <div>
-                  <strong className="text-emerald-400">🛡️ Voto com Login Oficial:</strong> Conta 1 voto verificado e autêntico por jogador na categoria, garantindo representatividade justa da comunidade.
+                  <strong className="text-emerald-400">🛡️ Voto Único (Com Login) — Peso 65%:</strong> Cada jogador conectado vota 1 única vez por categoria, garantindo autenticidade e o maior peso decisivo no resultado.
+                </div>
+                <div className="pt-2 border-t border-zinc-800 text-[11px] text-zinc-300 font-mono">
+                  ⚖️ <strong className="text-amber-300">Fórmula de Vitória:</strong> Score = (Único × 65%) + (Massa × 35%)
                 </div>
               </div>
             </div>

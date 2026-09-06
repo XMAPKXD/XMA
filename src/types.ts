@@ -11,8 +11,8 @@ export interface Nominee {
   projectMediaUrl?: string;
   projectType: 'music_clip' | 'media_creator' | 'parody' | 'look_style' | 'breakthrough' | 'community_icon';
   votes: number; // Total gross votes
-  verifiedVotes?: number; // Official logged-in unique votes (75% weight)
-  massVotes?: number; // Mass clicks / fan-club multi-votes (25% weight)
+  verifiedVotes?: number; // Official logged-in unique votes (65% weight - 1 vote per person)
+  massVotes?: number; // Mass clicks / fan-club multi-votes without login (35% weight - unlimited)
   pkxdId: string;
   bio: string;
   accentColor?: string;
@@ -128,4 +128,108 @@ export interface CeremonySettings {
   communityNominationsOpen?: boolean;
   countdownTargetIso?: string;
 }
+
+export type AppTab = 
+  | 'home' 
+  | 'categories' 
+  | 'nominees' 
+  | 'voting' 
+  | 'rules' 
+  | 'results' 
+  | 'news' 
+  | 'community_nominations' 
+  | 'ceremony' 
+  | 'admin';
+
+export interface XMANewsArticle {
+  id: string;
+  title: string;
+  subtitle: string;
+  summary: string;
+  content: string[];
+  category: 'Anúncio' | 'Indicados' | 'Votação' | 'Cerimônia' | 'Bastidores' | 'Regras';
+  publishedAt: string;
+  readTime: string;
+  imageUrl: string;
+  featured?: boolean;
+}
+
+export interface CookiePreferences {
+  essential?: boolean;
+  necessary?: boolean;
+  analytics: boolean;
+  functional?: boolean;
+  preferences?: boolean;
+  consentGiven?: boolean;
+  timestamp?: number;
+  acceptedAt?: string;
+}
+
+// Official XMA 2026 Dual-Voting System Weights
+// 1. Voto em Massa (Sem Login): Votos ilimitados para mutirões de torcida -> Peso 35% (0.35)
+// 2. Voto Único Oficial (Com Login): 1 voto por categoria por usuário autenticado -> Peso 65% (0.65)
+export const VOTE_WEIGHT_MASS = 0.35; // 35%
+export const VOTE_WEIGHT_VERIFIED = 0.65; // 65%
+
+// Cronograma Oficial do XMA 2026:
+// 1. Abertura das Votações: 10 de Setembro de 2026 às 19:00 (GMT-3 Brasília)
+// 2. Fechamento das Votações: 20 de Setembro de 2026 às 23:59:59 (GMT-3 Brasília)
+// 3. Revelação dos Vencedores / Gala Oficial: 25 de Setembro de 2026 às 19:00 (GMT-3 Brasília)
+export const XMA_SCHEDULE = {
+  // Mês 8 = Setembro no Date do JavaScript
+  VOTING_OPEN_TIMESTAMP: new Date(2026, 8, 10, 19, 0, 0).getTime(),
+  VOTING_CLOSE_TIMESTAMP: new Date(2026, 8, 20, 23, 59, 59).getTime(),
+  WINNERS_REVEAL_TIMESTAMP: new Date(2026, 8, 25, 19, 0, 0).getTime(),
+  VOTING_OPEN_ISO: '2026-09-10T19:00:00',
+  VOTING_CLOSE_ISO: '2026-09-20T23:59:59',
+  WINNERS_REVEAL_ISO: '2026-09-25T19:00:00'
+};
+
+export interface NomineeVotingScore {
+  uniqueVotes: number;
+  massVotes: number;
+  totalVotes: number;
+  uniqueSharePct: number; // % dentro dos votos com login da categoria
+  massSharePct: number; // % dentro dos votos em massa da categoria
+  weightedScorePct: number; // (% Único * 0.65) + (% Massa * 0.35)
+  weightedAbsoluteScore: number; // (únicos * 0.65) + (massa * 0.35)
+}
+
+export function calculateNomineeVotingScores(category: Category): Record<string, NomineeVotingScore> {
+  const result: Record<string, NomineeVotingScore> = {};
+  if (!category || !category.nominees || category.nominees.length === 0) {
+    return result;
+  }
+
+  const totalUnique = category.nominees.reduce((sum, n) => sum + (n.verifiedVotes || 0), 0);
+  const totalMass = category.nominees.reduce((sum, n) => {
+    const m = n.massVotes !== undefined ? n.massVotes : Math.max(0, n.votes - (n.verifiedVotes || 0));
+    return sum + m;
+  }, 0);
+
+  category.nominees.forEach((n) => {
+    const u = n.verifiedVotes || 0;
+    const m = n.massVotes !== undefined ? n.massVotes : Math.max(0, n.votes - u);
+    const total = u + m;
+    const uPct = totalUnique > 0 ? (u / totalUnique) * 100 : 0;
+    const mPct = totalMass > 0 ? (m / totalMass) * 100 : 0;
+    const weightedScorePct = (totalUnique > 0 || totalMass > 0)
+      ? Number(((uPct * VOTE_WEIGHT_VERIFIED) + (mPct * VOTE_WEIGHT_MASS)).toFixed(1))
+      : 0;
+    const weightedAbsoluteScore = Number(((u * VOTE_WEIGHT_VERIFIED) + (m * VOTE_WEIGHT_MASS)).toFixed(2));
+
+    result[n.id] = {
+      uniqueVotes: u,
+      massVotes: m,
+      totalVotes: total,
+      uniqueSharePct: Number(uPct.toFixed(1)),
+      massSharePct: Number(mPct.toFixed(1)),
+      weightedScorePct,
+      weightedAbsoluteScore
+    };
+  });
+
+  return result;
+}
+
 

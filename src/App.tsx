@@ -7,18 +7,27 @@ import {
   LiveChatMessage, 
   CommunityNomination, 
   PKXDUserAccount,
-  isAuthorizedAdminEmail
+  isAuthorizedAdminEmail,
+  AppTab
 } from './types';
 import { 
   INITIAL_CATEGORIES, 
   INITIAL_CEREMONY_SETTINGS, 
   INITIAL_CEREMONY_SEGMENTS, 
   INITIAL_CHAT_MESSAGES,
-  INITIAL_COMMUNITY_NOMINATIONS 
+  INITIAL_COMMUNITY_NOMINATIONS,
+  INITIAL_NEWS_ARTICLES 
 } from './data/initialData';
 import { Trophy } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { GoldenTicker } from './components/GoldenTicker';
+import { HeroHome } from './components/HeroHome';
+import { VotingBallot } from './components/VotingBallot';
+import { CategoriesView } from './components/CategoriesView';
+import { NomineesView } from './components/NomineesView';
+import { RulesView } from './components/RulesView';
+import { ResultsView } from './components/ResultsView';
+import { NewsView } from './components/NewsView';
 import { NomineesGallery } from './components/NomineesGallery';
 import { RealTimeVoting } from './components/RealTimeVoting';
 import { CommunityNominationForm } from './components/CommunityNominationForm';
@@ -27,6 +36,9 @@ import { AdminPanel } from './components/AdminPanel';
 import { NomineeDetailModal } from './components/NomineeDetailModal';
 import { PKXDLoginModal } from './components/PKXDLoginModal';
 import { CountdownTeaser } from './components/CountdownTeaser';
+import { CookieConsentBanner } from './components/CookieConsentBanner';
+import { LegalModal } from './components/LegalModals';
+import { Footer } from './components/Footer';
 import { triggerGoldenConfetti } from './utils/confetti';
 import { playVoteChime } from './utils/audio';
 import { setItemPersistent, getItemPersistent } from './utils/persistentStorage';
@@ -41,21 +53,23 @@ import {
 
 export default function App() {
   // Navigation
-  const [activeTab, setActiveTab] = useState<'gallery' | 'voting' | 'community_nominations' | 'ceremony' | 'admin'>('gallery');
+  const [activeTab, setActiveTab] = useState<AppTab>('home');
+  const [legalModalType, setLegalModalType] = useState<'privacy' | 'terms' | null>(null);
+  const [newsArticles] = useState(INITIAL_NEWS_ARTICLES);
 
   // Load Ceremony Settings
   const [settings, setSettings] = useState<CeremonySettings>(() => {
     return getItemPersistent('xma_ceremony_settings_v8', INITIAL_CEREMONY_SETTINGS);
   });
 
-  // Target timestamp: 15 de Setembro de 2026 às 19:00:00 (GMT-3 Brasília)
+  // Target timestamp: 10 de Setembro de 2026 às 19:00:00 (Abertura oficial das votações populares)
   const countdownTargetTimestamp = useMemo(() => {
-    if (settings?.countdownTargetIso) {
+    if (settings?.countdownTargetIso && settings.countdownTargetIso !== '2026-09-15T19:00:00') {
       const parsed = new Date(settings.countdownTargetIso).getTime();
       if (!isNaN(parsed)) return parsed;
     }
-    // Month index 8 is September in JavaScript Date
-    return new Date(2026, 8, 15, 19, 0, 0).getTime();
+    // Mês 8 = Setembro no Date do JavaScript (Dia 10 de Setembro de 2026)
+    return new Date(2026, 8, 10, 19, 0, 0).getTime();
   }, [settings?.countdownTargetIso]);
 
   // Is the countdown currently finished?
@@ -77,24 +91,43 @@ export default function App() {
     return true; // Locked for non-admins until countdown ends!
   });
 
-  // Smart Category Merging: Preserves both initial official nominees and any user-created categories/nominees
+  // Filter out any dummy / fake nominees so user can add real ones
+  const FAKE_NOMINEE_PREFIXES = [
+    'nom-admin', 'nom-nimda', 'nom-koosh', 'nom-bia-gamer',
+    'nom-hit-', 'nom-thumb-', 'nom-clipe-', 'nom-look-', 'nom-rev-', 'nom-collab-'
+  ];
+
+  const isFakeNominee = (id?: string) => {
+    if (!id) return false;
+    return FAKE_NOMINEE_PREFIXES.some((prefix) => id.startsWith(prefix));
+  };
+
+  const sanitizeCategories = (cats: Category[]): Category[] => {
+    return cats.map((cat) => ({
+      ...cat,
+      nominees: (cat.nominees || []).filter((n) => !isFakeNominee(n.id))
+    }));
+  };
+
+  // Smart Category Merging: Preserves both initial official categories and real nominees
   const mergeCategories = (base: Category[], incoming: Category[]): Category[] => {
     const map = new Map<string, Category>();
     for (const cat of base) {
-      if (cat.id) map.set(cat.id, { ...cat, nominees: [...(cat.nominees || [])] });
+      if (cat.id) map.set(cat.id, { ...cat, nominees: (cat.nominees || []).filter((n) => !isFakeNominee(n.id)) });
     }
     for (const inc of incoming) {
       if (!inc.id) continue;
+      const cleanIncomingNominees = (inc.nominees || []).filter((n) => !isFakeNominee(n.id));
       if (!map.has(inc.id)) {
-        map.set(inc.id, { ...inc, nominees: [...(inc.nominees || [])] });
+        map.set(inc.id, { ...inc, nominees: cleanIncomingNominees });
       } else {
         const existing = map.get(inc.id)!;
         const nomMap = new Map<string, Nominee>();
         for (const n of existing.nominees || []) {
-          if (n.id) nomMap.set(n.id, n);
+          if (n.id && !isFakeNominee(n.id)) nomMap.set(n.id, n);
         }
-        for (const n of inc.nominees || []) {
-          if (n.id) {
+        for (const n of cleanIncomingNominees) {
+          if (n.id && !isFakeNominee(n.id)) {
             if (!nomMap.has(n.id)) {
               nomMap.set(n.id, n);
             } else {
@@ -120,7 +153,7 @@ export default function App() {
   };
 
   const mergeWithInitialCategories = (loaded: Category[]): Category[] => {
-    return mergeCategories(INITIAL_CATEGORIES, loaded);
+    return sanitizeCategories(mergeCategories(INITIAL_CATEGORIES, loaded));
   };
 
   const mergeCommunityNominations = (current: CommunityNomination[], incoming: CommunityNomination[]): CommunityNomination[] => {
@@ -147,11 +180,20 @@ export default function App() {
   // Categories & Nominees State (100% Admin Controlled + Initial Data Safeguard)
   const [categories, setCategories] = useState<Category[]>(() => {
     try {
-      const saved = localStorage.getItem('xma_categories_2026_v7');
-      if (saved) {
-        const parsed = JSON.parse(saved);
+      const savedV8 = localStorage.getItem('xma_categories_2026_v8');
+      if (savedV8) {
+        const parsed = JSON.parse(savedV8);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return mergeWithInitialCategories(parsed);
+          return sanitizeCategories(mergeWithInitialCategories(parsed));
+        }
+      }
+      const savedV7 = localStorage.getItem('xma_categories_2026_v7');
+      if (savedV7) {
+        const parsed = JSON.parse(savedV7);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const clean = sanitizeCategories(mergeWithInitialCategories(parsed));
+          localStorage.setItem('xma_categories_2026_v8', JSON.stringify(clean));
+          return clean;
         }
       }
       return INITIAL_CATEGORIES;
@@ -292,11 +334,20 @@ export default function App() {
   useEffect(() => {
     async function loadPersistentData() {
       try {
-        const savedCats = await getItemPersistent<Category[]>('xma_categories_2026_v7', []);
-        if (Array.isArray(savedCats) && savedCats.length > 0) {
+        const savedCatsV8 = await getItemPersistent<Category[]>('xma_categories_2026_v8', []);
+        if (Array.isArray(savedCatsV8) && savedCatsV8.length > 0) {
           setCategories((current) => {
-            return mergeWithInitialCategories(mergeCategories(current, savedCats));
+            return sanitizeCategories(mergeWithInitialCategories(mergeCategories(current, savedCatsV8)));
           });
+        } else {
+          const savedCatsV7 = await getItemPersistent<Category[]>('xma_categories_2026_v7', []);
+          if (Array.isArray(savedCatsV7) && savedCatsV7.length > 0) {
+            setCategories((current) => {
+              const clean = sanitizeCategories(mergeWithInitialCategories(mergeCategories(current, savedCatsV7)));
+              setItemPersistent('xma_categories_2026_v8', clean);
+              return clean;
+            });
+          }
         }
 
         const savedNoms = await getItemPersistent<CommunityNomination[]>('xma_community_nominations_2026_v7', []);
@@ -323,8 +374,8 @@ export default function App() {
         if (isMounted && Array.isArray(cloudCats)) {
           if (cloudCats.length > 0) {
             setCategories((prev) => {
-              const merged = mergeWithInitialCategories(mergeCategories(prev, cloudCats));
-              setItemPersistent('xma_categories_2026_v7', merged);
+              const merged = sanitizeCategories(mergeWithInitialCategories(mergeCategories(prev, cloudCats)));
+              setItemPersistent('xma_categories_2026_v8', merged);
               return merged;
             });
             isCloudSyncedRef.current = true;
@@ -345,8 +396,8 @@ export default function App() {
       if (!isMounted) return;
       if (Array.isArray(cloudCategories) && cloudCategories.length > 0) {
         setCategories((prev) => {
-          const merged = mergeWithInitialCategories(mergeCategories(prev, cloudCategories));
-          setItemPersistent('xma_categories_2026_v7', merged);
+          const merged = sanitizeCategories(mergeWithInitialCategories(mergeCategories(prev, cloudCategories)));
+          setItemPersistent('xma_categories_2026_v8', merged);
           return merged;
         });
         isCloudSyncedRef.current = true;
@@ -373,7 +424,7 @@ export default function App() {
 
   // 3. Persistence Effects (Dual-layer IndexedDB + localStorage + Firestore)
   useEffect(() => {
-    setItemPersistent('xma_categories_2026_v7', categories);
+    setItemPersistent('xma_categories_2026_v8', categories);
     // CRITICAL: Only write back to Firestore if initial cloud data has already been loaded!
     // This stops empty or uninitialized local state on mount from wiping out saved Firestore data upon refresh!
     if (isCloudSyncedRef.current) {
@@ -489,6 +540,58 @@ export default function App() {
       }
     }));
     setUserVotes((prev) => ({ ...prev, [categoryId]: nomineeId }));
+  };
+
+  // Handle batch ballot submission from VotingBallot component
+  const handleSaveBallotVotes = (ballotSelections: Record<string, string>) => {
+    setCategories((prevCategories) => {
+      return prevCategories.map((cat) => {
+        const selectedNomId = ballotSelections[cat.id];
+        if (!selectedNomId) return cat;
+
+        const prevNomId = userAccount.verifiedVotes[cat.id];
+
+        return {
+          ...cat,
+          nominees: cat.nominees.map((n) => {
+            const currentVotes = n.votes || 0;
+            const currentVerified = n.verifiedVotes || 0;
+
+            if (n.id === selectedNomId) {
+              const isSame = prevNomId === selectedNomId;
+              return {
+                ...n,
+                votes: currentVotes + (isSame ? 0 : 1),
+                verifiedVotes: currentVerified + (isSame ? 0 : 1)
+              };
+            }
+
+            if (prevNomId && n.id === prevNomId && prevNomId !== selectedNomId) {
+              return {
+                ...n,
+                votes: Math.max(0, currentVotes - 1),
+                verifiedVotes: Math.max(0, currentVerified - 1)
+              };
+            }
+
+            return n;
+          })
+        };
+      });
+    });
+
+    setUserVotes((prev) => ({
+      ...prev,
+      ...ballotSelections
+    }));
+
+    setUserAccount((prev) => ({
+      ...prev,
+      verifiedVotes: {
+        ...prev.verifiedVotes,
+        ...ballotSelections
+      }
+    }));
   };
 
   // Community Nomination Submission
@@ -632,86 +735,155 @@ export default function App() {
         />
       )}
 
-      {/* Top Metallic Announcement Ticker */}
-      <GoldenTicker tickerText={settings.tickerText} />
-
-      {/* Main Navbar */}
-      <Navbar
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
-        userAccount={userAccount}
-        onOpenLoginModal={() => setIsLoginModalOpen(true)}
-        onShowCountdown={() => setIsCountdownActive(true)}
-        communityNominationsOpen={settings.communityNominationsOpen ?? false}
-      />
+      {/* Sticky Top Navigation Container: Ticker + Navbar */}
+      <div className="sticky top-0 z-50 w-full bg-[#07080c] shadow-[0_10px_30px_rgba(0,0,0,0.85)]">
+        <GoldenTicker tickerText={settings.tickerText} />
+        <Navbar
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          userAccount={userAccount}
+          onOpenLoginModal={() => setIsLoginModalOpen(true)}
+          onShowCountdown={() => setIsCountdownActive(true)}
+          communityNominationsOpen={settings.communityNominationsOpen ?? false}
+        />
+      </div>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        {activeTab === 'gallery' && (
-          <NomineesGallery
+      <main className="flex-1 w-full">
+        {activeTab === 'home' && (
+          <HeroHome
             categories={categories}
-            userVotes={userVotes}
-            onVote={(catId, nomId) => handleMassVote(catId, nomId, 1)}
-            onSelectNominee={(nominee, category) => setSelectedNomineeModal({ nominee, category })}
-            onSwitchToCeremony={() => setActiveTab('ceremony')}
-            onSwitchToAdmin={() => setActiveTab('admin')}
+            newsArticles={newsArticles}
+            countdownTargetTimestamp={countdownTargetTimestamp}
+            onNavigate={setActiveTab}
+            onSelectCategory={(cat) => {
+              setActiveTab('categories');
+            }}
+            onSelectNominee={(nominee, category) => {
+              setSelectedNomineeModal({ nominee, category });
+            }}
+            onSelectArticle={() => {
+              setActiveTab('news');
+            }}
+          />
+        )}
+
+        {activeTab === 'categories' && (
+          <CategoriesView
+            categories={categories}
+            onVoteCategory={(catId) => {
+              setActiveTab('voting');
+            }}
+            onSelectNomineeDetail={(nominee, category) => {
+              setSelectedNomineeModal({ nominee, category });
+            }}
+          />
+        )}
+
+        {activeTab === 'nominees' && (
+          <NomineesView
+            categories={categories}
+            onSelectNomineeDetail={(nominee, category) => {
+              setSelectedNomineeModal({ nominee, category });
+            }}
+            onVoteNominee={(catId, nomineeId) => {
+              handleVerifiedSingleVote(catId, nomineeId);
+              setActiveTab('voting');
+            }}
           />
         )}
 
         {activeTab === 'voting' && (
-          <RealTimeVoting
+          <VotingBallot
             categories={categories}
-            userVotes={userVotes}
             userAccount={userAccount}
-            onMassVote={handleMassVote}
-            onVerifiedSingleVote={handleVerifiedSingleVote}
-            onSelectNominee={(nominee, category) => setSelectedNomineeModal({ nominee, category })}
+            initialSelections={userVotes}
+            onSaveVotes={handleSaveBallotVotes}
             onOpenLoginModal={() => setIsLoginModalOpen(true)}
-            onSwitchToAdmin={() => setActiveTab('admin')}
+            onSelectNomineeDetail={(nominee, category) => {
+              setSelectedNomineeModal({ nominee, category });
+            }}
           />
+        )}
+
+        {activeTab === 'rules' && (
+          <RulesView />
+        )}
+
+        {activeTab === 'results' && (
+          <ResultsView
+            categories={categories}
+            onNavigateToCeremony={() => setActiveTab('ceremony')}
+            onSelectNomineeDetail={(nominee, category) => {
+              setSelectedNomineeModal({ nominee, category });
+            }}
+          />
+        )}
+
+        {activeTab === 'news' && (
+          <NewsView articles={newsArticles} />
+        )}
+
+        {activeTab === 'gallery' && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+            <NomineesGallery
+              categories={categories}
+              userVotes={userVotes}
+              onVote={(catId, nomId) => handleMassVote(catId, nomId, 1)}
+              onSelectNominee={(nominee, category) => setSelectedNomineeModal({ nominee, category })}
+              onSwitchToCeremony={() => setActiveTab('ceremony')}
+              onSwitchToAdmin={() => setActiveTab('admin')}
+            />
+          </div>
         )}
 
         {activeTab === 'community_nominations' && (
-          <CommunityNominationForm
-            categories={categories}
-            nominations={communityNominations}
-            onSubmitNomination={handleCommunityNominationSubmit}
-            onLikeNomination={handleLikeNomination}
-            userNickname={userAccount.nickname}
-            userPkxdTag={userAccount.pkxdTag}
-            isOpen={settings.communityNominationsOpen ?? false}
-            onNavigate={(tab) => setActiveTab(tab)}
-          />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+            <CommunityNominationForm
+              categories={categories}
+              nominations={communityNominations}
+              onSubmitNomination={handleCommunityNominationSubmit}
+              onLikeNomination={handleLikeNomination}
+              userNickname={userAccount.nickname}
+              userPkxdTag={userAccount.pkxdTag}
+              isOpen={settings.communityNominationsOpen ?? false}
+              onNavigate={(tab) => setActiveTab(tab)}
+            />
+          </div>
         )}
 
         {activeTab === 'ceremony' && (
-          <LiveCeremony
-            categories={categories}
-            settings={settings}
-            segments={segments}
-            chatMessages={chatMessages}
-            onSendMessage={handleSendMessage}
-            onOpenEnvelope={handleOpenEnvelope}
-            onToggleSound={() => setSettings({ ...settings, soundEffectsEnabled: !settings.soundEffectsEnabled })}
-          />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+            <LiveCeremony
+              categories={categories}
+              settings={settings}
+              segments={segments}
+              chatMessages={chatMessages}
+              onSendMessage={handleSendMessage}
+              onOpenEnvelope={handleOpenEnvelope}
+              onToggleSound={() => setSettings({ ...settings, soundEffectsEnabled: !settings.soundEffectsEnabled })}
+            />
+          </div>
         )}
 
         {activeTab === 'admin' && (
-          <AdminPanel
-            categories={categories}
-            settings={settings}
-            segments={segments}
-            communityNominations={communityNominations}
-            userAccount={userAccount}
-            onUpdateCategories={setCategories}
-            onUpdateSettings={setSettings}
-            onUpdateSegments={setSegments}
-            onUpdateCommunityNominations={setCommunityNominations}
-            onSendAdminMessage={handleSendMessage}
-            onResetData={handleResetData}
-            onLoginAdmin={(nick, tag, avatar, email) => handleLogin(nick, tag, avatar, email)}
-            onOpenLoginModal={() => setIsLoginModalOpen(true)}
-          />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+            <AdminPanel
+              categories={categories}
+              settings={settings}
+              segments={segments}
+              communityNominations={communityNominations}
+              userAccount={userAccount}
+              onUpdateCategories={setCategories}
+              onUpdateSettings={setSettings}
+              onUpdateSegments={setSegments}
+              onUpdateCommunityNominations={setCommunityNominations}
+              onSendAdminMessage={handleSendMessage}
+              onResetData={handleResetData}
+              onLoginAdmin={(nick, tag, avatar, email) => handleLogin(nick, tag, avatar, email)}
+              onOpenLoginModal={() => setIsLoginModalOpen(true)}
+            />
+          </div>
         )}
       </main>
 
@@ -742,68 +914,24 @@ export default function App() {
       />
 
       {/* Refined Luxury Footer */}
-      <footer className="mt-auto border-t border-amber-500/20 bg-[#06070a] py-10 text-xs text-zinc-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-6 border-b border-zinc-900">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 to-amber-600 p-[1px]">
-                <div className="w-full h-full bg-[#0b0c13] rounded-[11px] flex items-center justify-center">
-                  <Trophy className="w-4 h-4 text-amber-400" />
-                </div>
-              </div>
-              <div className="text-left">
-                <span className="text-white font-cinzel font-black tracking-wider text-sm block">
-                  XMA 2026
-                </span>
-                <span className="text-[10px] text-zinc-400">
-                  PK XD Music & Media Awards
-                </span>
-              </div>
-            </div>
+      <Footer
+        onNavigate={setActiveTab}
+        onOpenPrivacy={() => setLegalModalType('privacy')}
+        onOpenTerms={() => setLegalModalType('terms')}
+      />
 
-            <div className="flex items-center gap-6 text-xs text-zinc-400">
-              <button 
-                onClick={() => setActiveTab('gallery')} 
-                className="hover:text-amber-300 transition-colors cursor-pointer"
-              >
-                Galeria de Indicados
-              </button>
-              <button 
-                onClick={() => setActiveTab('voting')} 
-                className="hover:text-amber-300 transition-colors cursor-pointer"
-              >
-                Urna de Votação
-              </button>
-              <button 
-                onClick={() => setActiveTab('ceremony')} 
-                className="hover:text-amber-300 transition-colors cursor-pointer"
-              >
-                Palco da Cerimônia
-              </button>
-              <button 
-                onClick={() => setActiveTab('admin')} 
-                className="hover:text-amber-300 transition-colors cursor-pointer"
-              >
-                Painel Admin
-              </button>
-            </div>
+      {/* Cookie Consent Banner */}
+      <CookieConsentBanner
+        onOpenPrivacyPolicy={() => setLegalModalType('privacy')}
+        onOpenTermsOfService={() => setLegalModalType('terms')}
+      />
 
-            <div className="flex items-center gap-2 text-[11px] font-mono text-amber-400/90 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span>Edição Oficial 2026</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-zinc-500 text-[11px]">
-            <p>
-              XMA 2026 • Plataforma de Premiação Oficial da Comunidade de Criadores e Fãs de PK XD.
-            </p>
-            <p className="text-zinc-600">
-              Design Dourado Metálico & Obsidian Luxury
-            </p>
-          </div>
-        </div>
-      </footer>
+      {/* Legal Modals (Privacy Policy / Terms of Service) */}
+      <LegalModal
+        isOpen={Boolean(legalModalType)}
+        type={legalModalType}
+        onClose={() => setLegalModalType(null)}
+      />
     </div>
   );
 }

@@ -231,7 +231,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const syncToCloud = async (cats: Category[]) => {
     try {
       setSyncStatus('saving');
-      setItemPersistent('xma_categories_2026_v7', cats);
+      setItemPersistent('xma_categories_2026_v8', cats);
       const res = await saveAllCategoriesToFirestore(cats);
       setSyncStatus(res ? 'synced' : 'idle');
       setTimeout(() => {
@@ -241,6 +241,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       console.warn('Erro ao sincronizar categorias com Firestore (salvo localmente):', err);
       setSyncStatus('idle');
     }
+  };
+
+  // Clear all fake / dummy nominees to start completely fresh with real nominees
+  const handlePurgeAllFakeNominees = () => {
+    if (!confirm('Deseja realmente zerar todos os indicados de teste/fakes de todas as categorias para adicionar apenas os reais?')) return;
+    const updated = categories.map((cat) => ({
+      ...cat,
+      nominees: []
+    }));
+    onUpdateCategories(updated);
+    syncToCloud(updated);
+    setBulkSuccessMessage('Todos os indicados de teste/fakes foram removidos com sucesso! As categorias estão limpas para você adicionar os indicados reais.');
   };
 
   // Google Admin Sign-in Handler
@@ -941,6 +953,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
 
               <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={handlePurgeAllFakeNominees}
+                  className="px-3.5 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/50 text-red-300 border border-red-500/40 hover:border-red-400 font-bold text-xs uppercase flex items-center gap-1.5 cursor-pointer transition-all shadow-md"
+                  title="Zerar indicados de teste para deixar limpo para os reais"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  <span>Limpar Fakes</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setIsBulkImporterOpen(true)}
@@ -1941,6 +1963,77 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </button>
               </div>
             </form>
+
+            {/* Official Schedule & Countdown Target Configuration */}
+            <div className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-bold text-amber-300 font-cinzel">
+                    Cronograma Oficial do XMA 2026 & Alvo da Contagem
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Define o destino do cronômetro da página inicial e da tela de contagem bloqueada.
+                  </p>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-[11px] font-bold">
+                  Atual: {settings.countdownTargetIso || '2026-09-10T19:00:00'}
+                </span>
+              </div>
+
+              {/* Presets Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpdateSettings({ ...settings, countdownTargetIso: '2026-09-10T19:00:00' });
+                    try { playAdminGavel(); } catch {}
+                  }}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    (!settings.countdownTargetIso || settings.countdownTargetIso.startsWith('2026-09-10'))
+                      ? 'bg-amber-500/20 border-amber-400 text-white font-bold'
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="block text-[10px] font-mono text-amber-400 font-bold uppercase">FASE 1 • DIA 10/09</span>
+                  <span className="text-xs font-bold text-white block">Abertura das Votações</span>
+                  <span className="text-[10px] text-zinc-400 block mt-0.5">10 de Setembro às 19:00</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpdateSettings({ ...settings, countdownTargetIso: '2026-09-20T23:59:59' });
+                    try { playAdminGavel(); } catch {}
+                  }}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    settings.countdownTargetIso && settings.countdownTargetIso.startsWith('2026-09-20')
+                      ? 'bg-amber-500/20 border-amber-400 text-white font-bold'
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="block text-[10px] font-mono text-zinc-400 font-bold uppercase">FASE 2 • DIA 20/09</span>
+                  <span className="text-xs font-bold text-white block">Fechamento das Urnas</span>
+                  <span className="text-[10px] text-zinc-400 block mt-0.5">20 de Setembro às 23:59</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpdateSettings({ ...settings, countdownTargetIso: '2026-09-25T19:00:00' });
+                    try { playAdminGavel(); } catch {}
+                  }}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    settings.countdownTargetIso && settings.countdownTargetIso.startsWith('2026-09-25')
+                      ? 'bg-amber-500/20 border-amber-400 text-white font-bold'
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="block text-[10px] font-mono text-amber-300 font-bold uppercase">FASE 3 • DIA 25/09</span>
+                  <span className="text-xs font-bold text-white block">Revelação Vencedores</span>
+                  <span className="text-[10px] text-zinc-400 block mt-0.5">25 de Setembro às 19:00</span>
+                </button>
+              </div>
+            </div>
 
             {/* Reset Data Danger Zone */}
             <div className="p-5 rounded-2xl bg-red-950/20 border border-red-800/60 flex items-center justify-between">

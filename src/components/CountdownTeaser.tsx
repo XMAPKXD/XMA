@@ -88,11 +88,11 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
   userPkxdTag = '',
   onAdminUnlock
 }) => {
-  // Target timestamp: 15 de Setembro de 2026 às 19:00 (Horário Oficial de Brasília / GMT-3)
+  // Target timestamp: 10 de Setembro de 2026 às 19:00 (Abertura Oficial das Votações)
   const targetTimestamp = useMemo(() => {
     if (targetDate) return targetDate.getTime();
-    // 15 de Setembro de 2026 às 19:00:00 (Mês 8 = Setembro no JS Date)
-    return new Date(2026, 8, 15, 19, 0, 0).getTime();
+    // 10 de Setembro de 2026 às 19:00:00 (Mês 8 = Setembro no JS Date)
+    return new Date(2026, 8, 10, 19, 0, 0).getTime();
   }, [targetDate]);
 
   const [timeLeft, setTimeLeft] = useState<{
@@ -303,7 +303,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
         setIsAdminModalOpen(false);
         onReveal();
       } else {
-        setAdminError(`Acesso antecipado exclusivo para administradores. A conta (${googleUser.email}) foi conectada com sucesso, mas a plataforma só abrirá para o público geral após a contagem regressiva em 15 de Setembro às 19:00.`);
+        setAdminError(`Acesso antecipado exclusivo para administradores. A conta (${googleUser.email}) foi conectada com sucesso, mas a plataforma só abrirá para o público geral após a contagem regressiva em 10 de Setembro às 19:00 (Abertura Oficial das Votações).`);
         setIsAdminModalOpen(true);
       }
     } catch (err: any) {
@@ -661,7 +661,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
     <div
       id="countdown-teaser-overlay"
       onClick={handleUserInteract}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-[#040407] text-white select-none overflow-y-auto overflow-x-hidden"
+      className="fixed inset-0 z-50 flex flex-col bg-[#040407] text-white select-none overflow-y-auto overflow-x-hidden"
     >
       {/* Background Falling Golden Elements (Canvas) */}
       <canvas
@@ -673,17 +673,89 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-500/15 via-[#08080f]/90 to-[#020204] z-0 pointer-events-none" />
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-500/10 rounded-full blur-[160px] pointer-events-none z-0 animate-pulse" />
 
-      {/* Top Bar: Controls & Sound Toggle */}
-      <header className="w-full max-w-6xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6 flex flex-col gap-3 z-20 relative">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-            <span className="text-[10px] sm:text-[11px] tracking-[0.2em] uppercase font-mono text-amber-300/90 font-bold drop-shadow-sm truncate">
-              {viewMode === 'teaser' ? 'CONTAGEM REGRESSIVA OFICIAL' : viewMode === 'revealing' ? 'ABERTURA ÉPICA EM ANDAMENTO' : 'REVELAÇÃO OFICIAL XMA'}
-            </span>
+      {/* Top Bar: Fixed/Sticky at the very top (0px) at all times */}
+      <header className="sticky top-0 z-40 w-full bg-[#040407]/95 backdrop-blur-2xl border-b border-amber-500/25 shadow-[0_6px_25px_rgba(0,0,0,0.85)] px-3 sm:px-6 py-2.5 sm:py-3 transition-all shrink-0">
+        <div className="w-full max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
+          {/* Logo / Badge */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 via-amber-300 to-amber-700 p-[1.5px] shadow-md shadow-amber-500/20">
+              <div className="w-full h-full bg-[#090a0f] rounded-[9px] flex items-center justify-center">
+                <Trophy className="w-4 h-4 text-amber-400" />
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+                <span className="text-[10px] sm:text-[11px] tracking-[0.2em] uppercase font-mono text-amber-300 font-bold drop-shadow-sm truncate max-w-[130px] sm:max-w-none">
+                  {viewMode === 'teaser' ? 'CONTAGEM REGRESSIVA' : viewMode === 'revealing' ? 'ABERTURA ÉPICA' : 'REVELAÇÃO XMA'}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Center Tabs pinned at the top for quick access */}
+          {viewMode === 'teaser' && (
+            <div className="hidden md:flex items-center gap-1 bg-zinc-950/80 p-1 rounded-full border border-amber-500/30">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveTeaserTab('nominees');
+                  document.getElementById('teaser-tabs-content')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTeaserTab === 'nominees'
+                    ? 'bg-amber-400 text-black shadow-sm font-extrabold'
+                    : 'text-zinc-400 hover:text-amber-200'
+                }`}
+              >
+                <Trophy className="w-3 h-3" />
+                <span>Indicados</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${
+                  activeTeaserTab === 'nominees' ? 'bg-black/20 text-black' : 'bg-amber-500/20 text-amber-300'
+                }`}>
+                  {categories.reduce((acc, c) => acc + (c.nominees?.length || 0), 0)}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveTeaserTab('about');
+                  document.getElementById('teaser-tabs-content')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTeaserTab === 'about'
+                    ? 'bg-amber-400 text-black shadow-sm font-extrabold'
+                    : 'text-zinc-400 hover:text-amber-200'
+                }`}
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>Sobre o XMA</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveTeaserTab('nominate');
+                  document.getElementById('teaser-tabs-content')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTeaserTab === 'nominate'
+                    ? 'bg-amber-400 text-black shadow-sm font-extrabold'
+                    : 'text-zinc-400 hover:text-amber-200'
+                }`}
+              >
+                <Lock className="w-3 h-3 text-red-400" />
+                <span>Indicações</span>
+              </button>
+            </div>
+          )}
+
+          {/* Right Action Controls */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Sound Toggle */}
             {viewMode === 'teaser' && (
               <button
@@ -699,12 +771,12 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                 {isMuted ? (
                   <>
                     <VolumeX className="w-3.5 h-3.5 text-zinc-400" />
-                    <span className="text-[11px] hidden sm:inline">Tic-Tac Mudo</span>
+                    <span className="text-[11px] hidden sm:inline">Mudo</span>
                   </>
                 ) : (
                   <>
                     <Volume2 className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                    <span className="text-[11px] hidden sm:inline">Tic-Tac Ativo</span>
+                    <span className="text-[11px] hidden sm:inline">Tic-Tac</span>
                   </>
                 )}
               </button>
@@ -717,7 +789,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                 handleEnterPlatformClick();
               }}
               disabled={isGoogleLoading}
-              className={`px-3.5 sm:px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 ${
+              className={`px-3 sm:px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50 ${
                 isCountdownFinished || isAdminUnlocked
                   ? 'bg-gold-metallic-btn text-black shadow-amber-500/30'
                   : 'bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 text-black shadow-amber-500/20'
@@ -733,22 +805,22 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
               {isGoogleLoading ? (
                 <>
                   <Sparkles className="w-3.5 h-3.5 text-black animate-spin" />
-                  <span>Conectando...</span>
+                  <span className="hidden sm:inline">Conectando...</span>
                 </>
               ) : isCountdownFinished ? (
                 <>
                   <Trophy className="w-3.5 h-3.5" />
-                  <span>Entrar na Plataforma 🏆</span>
+                  <span>Entrar 🏆</span>
                 </>
               ) : isAdminUnlocked ? (
                 <>
                   <Crown className="w-3.5 h-3.5" />
-                  <span>Entrar na Plataforma (Admin) 🔓</span>
+                  <span>Entrar (Admin) 🔓</span>
                 </>
               ) : (
                 <>
                   <LogIn className="w-3.5 h-3.5" />
-                  <span>Entrar na Plataforma</span>
+                  <span>Entrar</span>
                 </>
               )}
             </button>
@@ -761,11 +833,12 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                   handleGoogleAdminLogin();
                 }}
                 disabled={isGoogleLoading}
-                className="px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-amber-500/20 hover:from-amber-500/40 hover:to-amber-400/40 text-amber-200 border border-amber-400/50 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-lg backdrop-blur-md hover:scale-105 active:scale-95 disabled:opacity-50"
+                className="px-2.5 sm:px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-amber-500/20 hover:from-amber-500/40 hover:to-amber-400/40 text-amber-200 border border-amber-400/50 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-lg backdrop-blur-md hover:scale-105 active:scale-95 disabled:opacity-50"
                 title="Acesso exclusivo para administradores com login Google"
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
-                <span>Só Admins (Google) 🔐</span>
+                <span className="hidden sm:inline">Só Admins (Google) 🔐</span>
+                <span className="sm:hidden">Admin</span>
               </button>
             ) : (
               <div className="flex items-center gap-1.5">
@@ -789,12 +862,73 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
           </div>
         </div>
 
+        {/* Mobile Tabs Sub-row in Sticky Header */}
+        {viewMode === 'teaser' && (
+          <div className="flex md:hidden items-center justify-center gap-1 pt-2 border-t border-amber-500/15 mt-2 overflow-x-auto no-scrollbar">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveTeaserTab('nominees');
+                document.getElementById('teaser-tabs-content')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                activeTeaserTab === 'nominees'
+                  ? 'bg-amber-400 text-black shadow-sm font-extrabold'
+                  : 'text-zinc-400 hover:text-amber-200'
+              }`}
+            >
+              <Trophy className="w-3 h-3" />
+              <span>Indicados</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${
+                activeTeaserTab === 'nominees' ? 'bg-black/20 text-black' : 'bg-amber-500/20 text-amber-300'
+              }`}>
+                {categories.reduce((acc, c) => acc + (c.nominees?.length || 0), 0)}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveTeaserTab('about');
+                document.getElementById('teaser-tabs-content')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                activeTeaserTab === 'about'
+                  ? 'bg-amber-400 text-black shadow-sm font-extrabold'
+                  : 'text-zinc-400 hover:text-amber-200'
+              }`}
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>Sobre o XMA</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveTeaserTab('nominate');
+                document.getElementById('teaser-tabs-content')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                activeTeaserTab === 'nominate'
+                  ? 'bg-amber-400 text-black shadow-sm font-extrabold'
+                  : 'text-zinc-400 hover:text-amber-200'
+              }`}
+            >
+              <Lock className="w-3 h-3 text-red-400" />
+              <span>Indicações</span>
+            </button>
+          </div>
+        )}
+
         {/* Exclusive Admin Quick Simulation Bar (Only visible after authenticating as Admin) */}
         {isAdminUnlocked && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full p-2.5 sm:p-3 rounded-2xl bg-gradient-to-r from-amber-950/80 via-[#18150f] to-amber-950/80 border-2 border-amber-500/60 shadow-xl shadow-amber-950/40 flex flex-col sm:flex-row items-center justify-between gap-2.5"
+            className="w-full max-w-6xl mx-auto mt-2 p-2.5 sm:p-3 rounded-2xl bg-gradient-to-r from-amber-950/80 via-[#18150f] to-amber-950/80 border-2 border-amber-500/60 shadow-xl shadow-amber-950/40 flex flex-col sm:flex-row items-center justify-between gap-2.5"
           >
             <div className="flex items-center gap-2 text-left w-full sm:w-auto">
               <div className="w-7 h-7 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0">
@@ -820,7 +954,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                   }
                 }}
                 className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 text-xs font-bold transition-all shadow-sm cursor-pointer"
-                title={simulatedEnd ? "Restaurar contagem real de 15 de Setembro" : "Simular fim do cronômetro para testar liberação pública"}
+                title={simulatedEnd ? "Restaurar contagem real de 10 de Setembro" : "Simular fim do cronômetro para testar liberação pública"}
               >
                 {simulatedEnd ? "⏰ Restaurar Contagem Oficial" : "⚡ Simular Fim da Contagem (Liberar p/ Todos)"}
               </button>
@@ -897,13 +1031,30 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
             <p className="text-[11px] sm:text-base font-semibold uppercase tracking-[0.25em] sm:tracking-[0.4em] text-amber-300/90 font-mono">
               PK XD Music & Media Awards 2026
             </p>
-            <p className="text-[11px] sm:text-sm text-zinc-400 font-medium">
-              Grande Estreia Mundial: <strong className="text-amber-300">15 de Setembro às 19:00 (Horário Oficial de Brasília)</strong>
+            <p className="text-[11px] sm:text-sm text-zinc-300 font-medium">
+              Contagem Regressiva para a <strong className="text-amber-300 font-bold">Abertura Oficial das Votações: 10 de Setembro às 19:00</strong>
             </p>
+
+            {/* Official 3-Phase Timeline Preview */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 max-w-xl mx-auto text-left pt-2 pb-1">
+              <div className="px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-400/50 text-amber-200 text-xs">
+                <span className="block font-mono text-[10px] text-amber-400 font-black uppercase">Fase 1 • 10/09</span>
+                <span className="font-bold text-white">Abertura das Votações</span>
+              </div>
+              <div className="px-3 py-2 rounded-xl bg-zinc-900/80 border border-zinc-800 text-zinc-300 text-xs">
+                <span className="block font-mono text-[10px] text-zinc-400 font-black uppercase">Fase 2 • 20/09</span>
+                <span className="font-bold text-zinc-200">Fechamento das Urnas</span>
+              </div>
+              <div className="px-3 py-2 rounded-xl bg-zinc-900/80 border border-zinc-800 text-zinc-300 text-xs">
+                <span className="block font-mono text-[10px] text-amber-300/80 font-black uppercase">Fase 3 • 25/09</span>
+                <span className="font-bold text-amber-300">Revelação dos Campeões</span>
+              </div>
+            </div>
+
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-400/30 text-amber-300 text-[10px] sm:text-xs font-mono shadow-sm">
               <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <span>
-                Até a contagem acabar: <strong className="text-white">Apenas Admins</strong>. Após o fim da contagem: <strong className="text-amber-300">Liberado para qualquer pessoa!</strong>
+                Até a contagem acabar: <strong className="text-white">Apenas Admins</strong>. Após o fim da contagem (10/09): <strong className="text-amber-300">Liberado para qualquer pessoa votar!</strong>
               </span>
             </div>
           </motion.div>
@@ -976,10 +1127,11 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
           {/* ABAS INTERATIVAS NA TELA DE CONTAGEM REGRESSIVA */}
           {/* ========================================================================= */}
           <motion.div
+            id="teaser-tabs-content"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.9 }}
-            className="w-full max-w-5xl mt-8 mb-12 relative z-20 text-left"
+            className="w-full max-w-5xl mt-8 mb-12 relative z-20 text-left scroll-mt-24"
           >
             {/* Main Tabs Selector */}
             <div className="flex items-center justify-center p-1.5 bg-zinc-950/90 rounded-2xl sm:rounded-full border-2 border-amber-500/40 backdrop-blur-2xl shadow-xl shadow-amber-950/30 mb-6 max-w-2xl mx-auto flex-wrap sm:flex-nowrap gap-1.5">
@@ -1062,12 +1214,12 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                     </div>
                   </div>
 
-                  {/* Category Filter Pills */}
-                  <div className="pt-4 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar relative z-10">
+                  {/* Category Filter Pills (Sticky under Top Header) */}
+                  <div className="sticky top-[54px] sm:top-[64px] z-30 pt-3 pb-2 -mx-6 px-6 bg-[#0c0d17]/95 backdrop-blur-xl border-t border-b border-amber-500/20 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-xl mt-4">
                     <button
                       type="button"
                       onClick={() => setSelectedCategoryFilter('all')}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
                         selectedCategoryFilter === 'all'
                           ? 'bg-amber-400 text-black shadow-md font-extrabold'
                           : 'bg-zinc-900/90 text-zinc-400 hover:text-white border border-zinc-800'
@@ -1084,7 +1236,7 @@ export const CountdownTeaser: React.FC<CountdownTeaserProps> = ({
                         key={cat.id}
                         type="button"
                         onClick={() => setSelectedCategoryFilter(cat.id)}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
                           selectedCategoryFilter === cat.id
                             ? 'bg-amber-400 text-black shadow-md font-extrabold'
                             : 'bg-zinc-900/90 text-zinc-400 hover:text-white border border-zinc-800'
